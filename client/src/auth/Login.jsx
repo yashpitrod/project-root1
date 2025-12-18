@@ -1,28 +1,60 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import '../styles/auth.css';
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebase";
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student');
+  const [role, setRole] = useState('student'); // UI only
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const validateEmail = (email) => {
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
     return gmailRegex.test(email);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setError('');
+
     if (!validateEmail(email)) {
       setError('Please use a valid Gmail address (@gmail.com)');
       return;
     }
-    
-    // Placeholder - no actual login logic
-    console.log('Login attempt:', { email, role });
+
+    try {
+      // 1️⃣ Firebase login
+      const userCred = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const token = await userCred.user.getIdToken();
+      localStorage.setItem("token", token);
+
+      // 2️⃣ Get role from backend
+      const res = await fetch("http://localhost:5000/api/auth/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch user data");
+
+      const data = await res.json();
+
+      // 3️⃣ Role-based redirect (backend decides)
+      if (data.role === "doctor") navigate("/doctor");
+      else navigate("/student");
+
+    } catch (err) {
+      console.error(err);
+      setError("Invalid email or password");
+    }
   };
 
   return (
@@ -56,7 +88,6 @@ const Login = () => {
               className="form-select"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              required
             >
               <option value="student">Student</option>
               <option value="staff">Staff</option>
