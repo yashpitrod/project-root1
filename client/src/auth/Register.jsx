@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/auth.css';
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebase";
 
 const BRANCHES = [
   // Engineering
@@ -31,34 +33,14 @@ const BRANCHES = [
   'Physics',
   'Chemistry',
   'Mathematics',
-  'Biology',
-  'Zoology',
-  'Botany',
   'Microbiology',
   'Biochemistry',
-  'Statistics',
-  'Computer Science',
   'Data Science',
-  // Arts & Commerce
   'Economics',
-  'Psychology',
-  'Sociology',
-  'Political Science',
-  'History',
   'English Literature',
-  'Commerce',
-  'Business Administration',
   'Accounting & Finance',
-  // Medical & Health
-  'Pharmacy',
-  'Nursing',
-  'Physiotherapy',
-  'Medical Lab Technology',
   // Others
   'Architecture',
-  'Design',
-  'Law',
-  'Journalism',
   'Other',
 ];
 
@@ -107,7 +89,7 @@ const Register = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    
+
     // Clear email error when typing
     if (name === 'email') {
       setError('');
@@ -119,24 +101,69 @@ const Register = () => {
     return gmailRegex.test(email);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setError('');
+
+    const {
+      email,
+      password,
+      confirmPassword,
+      fullName,
+      branch,
+      year,
+      department,
+      specialization,
+    } = formData;
+
     // Validate Gmail
-    if (!validateEmail(formData.email)) {
+    if (!validateEmail(email)) {
       setError('Please use a valid Gmail address (@gmail.com)');
       return;
     }
-    
+
     // Validate password match
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
-    // Placeholder - no actual registration logic
-    console.log('Register attempt:', { role, ...formData });
+
+    try {
+      // 1️⃣ Firebase signup
+      const userCred = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const token = await userCred.user.getIdToken();
+
+      // 2️⃣ Save user to backend
+      await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          role,
+          fullName,
+          email,
+          branch: role === 'doctor' ? null : branch,
+          year: role === 'student' ? year : null,
+          department: role === 'doctor' ? department : null,
+          specialization: role === 'doctor' ? specialization : null,
+        }),
+      });
+
+      console.log("Registration successful");
+
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Registration failed");
+    }
   };
+
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 8 }, (_, i) => currentYear + i);
