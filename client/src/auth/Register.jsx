@@ -86,6 +86,17 @@ const Register = () => {
     setError('');
   };
 
+  const verifyDoctorEmail = async (email) => {
+    const res = await fetch("http://localhost:5000/api/auth/verify-doctor-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+    return data.valid;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -129,6 +140,16 @@ const Register = () => {
     }
 
     try {
+      //for checking wheather it is a doctor or not 
+      if (role === "doctor") {
+        const isValid = await verifyDoctorEmail(email);
+
+        if (!isValid) {
+          alert("Unauthorized doctor email");
+          return;
+        }
+      }
+
       // 1️⃣ Firebase signup
       const userCred = await createUserWithEmailAndPassword(
         auth,
