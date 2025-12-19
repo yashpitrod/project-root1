@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "../styles/auth.css";
+import "../styles/studentdash.css";
 
 // ============ DASHBOARD HEADER ============
 const DashboardHeader = ({ userName }) => {
@@ -175,7 +175,7 @@ const HealthRequestForm = ({ onSubmit }) => {
 const doctors = [
   { id: "doc1", name: "Dr. Sharma", available: true, specialty: "General Physician" },
   { id: "doc2", name: "Dr. Patel", available: true, specialty: "General Physician" },
-  { id: "doc3", name: "Dr. Khan", available: false, specialty: "General Physician" },
+  { id: "doc3", name: "Dr. Khan", available: false, specialty: "General Physician"},
 ];
 
 const generateTimeSlots = () => {
