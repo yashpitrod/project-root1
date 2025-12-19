@@ -1,8 +1,8 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Login from "../auth/Login";
-import Register from "../auth/Register";
-import StudentDashboard from "./StudentDashboard.jsx";
-import DoctorDashboard from "../pages/DoctorDashboard";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Login from '../auth/Login';
+import Register from '../auth/Register';
+import StudentDashboard from '../pages/StudentDashboard';
+import DoctorDashboard from '../pages/DoctorDashboard';
 
 const AppRouter = () => {
   return (
@@ -17,5 +17,4 @@ const AppRouter = () => {
   );
 };
 
-export default AppRouter;
-
+export default AppRouter;  
