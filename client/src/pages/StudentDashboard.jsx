@@ -1,9 +1,9 @@
 import { useState } from "react";
 import '../styles/studentdash.css';
-import doctorSharma from 'C:\\Users\\biyan\\Documents\\project-root1\\client\\src\\pages\\doctor-sharma.png';
-import doctorPatel from 'C:\\Users\\biyan\\Documents\\project-root1\\client\\src\\pages\\doctor-patel.png';
-import doctorGupta from 'C:\\Users\\biyan\\Documents\\project-root1\\client\\src\\pages\\doctor-gupta.png';
-import doctorSingh from 'C:\\Users\\biyan\\Documents\\project-root1\\client\\src\\pages\\doctor-singh.png';
+import doctorSharma from '../assets/doctor-sharma.png';
+import doctorPatel from '../assets/doctor-patel.png';
+import doctorGupta from '../assets/doctor-gupta.png';
+import doctorSingh from '../assets/doctor-singh.png';
 
 
 
