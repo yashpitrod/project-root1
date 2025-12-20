@@ -1,0 +1,179 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+body {
+  background: #f5f7fa;
+}
+
+/* Layout */
+.dashboard {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 280px;
+  background: #ffffff;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logo {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.logo-icon {
+  font-size: 2rem;
+}
+
+.logo h2 {
+  color: #2e7d32;
+}
+
+.logo-sub {
+  font-size: 0.85rem;
+  color: #81c784;
+}
+
+.doctor-info {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.avatar {
+  width: 60px;
+  height: 60px;
+  background: #2e7d32;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  font-weight: bold;
+}
+
+.status-badge {
+  margin-top: 0.75rem;
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.status-badge.online {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.offline {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* Menu */
+.menu {
+  padding: 1rem;
+}
+
+.menu-item {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.menu-item.active {
+  background: #2e7d32;
+  color: white;
+}
+
+.badge {
+  float: right;
+  background: red;
+  color: white;
+  border-radius: 50%;
+  padding: 2px 7px;
+  font-size: 0.7rem;
+}
+
+/* Main */
+.main-content {
+  flex: 1;
+  padding: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.stats div {
+  text-align: center;
+  margin-left: 1rem;
+}
+
+.page {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+}
+
+/* Appointments */
+.appointment-card {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid #e0e0e0;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn.approve {
+  background: #2e7d32;
+  color: white;
+}
+
+.btn.reject {
+  background: #d32f2f;
+  color: white;
+}
+
+.tag.approved {
+  color: green;
+}
+
+.tag.rejected {
+  color: red;
+}
+
+/* Settings */
+.setting {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 0;
+}
