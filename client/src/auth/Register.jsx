@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import '../styles/auth.css';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "./firebase";
@@ -58,6 +58,8 @@ const DEPARTMENTS = [
 ];
 
 const Register = () => {
+  const navigate = useNavigate();
+
   const [role, setRole] = useState('student');
   const [formData, setFormData] = useState({
     fullName: '',
@@ -69,6 +71,7 @@ const Register = () => {
     password: '',
     confirmPassword: '',
   });
+
   const [error, setError] = useState('');
 
   const handleRoleChange = (newRole) => {
@@ -100,11 +103,7 @@ const Register = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Clear email error when typing
-    if (name === 'email') {
-      setError('');
-    }
+    if (name === 'email') setError('');
   };
 
   const validateEmail = (email) => {
@@ -150,7 +149,7 @@ const Register = () => {
         }
       }
 
-      // 1️⃣ Firebase signup
+      // 🔐 Firebase signup
       const userCred = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -159,7 +158,7 @@ const Register = () => {
 
       const token = await userCred.user.getIdToken();
 
-      // 2️⃣ Save user to backend
+      // 🧠 Save user in backend
       await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
         headers: {
@@ -177,7 +176,9 @@ const Register = () => {
         }),
       });
 
-      console.log("Registration successful");
+      // ✅ SUCCESS → redirect to login
+      alert("Registration successful! Please sign in.");
+      navigate("/");
 
     } catch (err) {
       console.error(err);
@@ -195,260 +196,116 @@ const Register = () => {
   return (
     <div className="auth-container">
       <div className="auth-card register-card">
-        <div className="auth-header">
-          <div className="auth-logo">
-            <div className="auth-logo-icon">🏥</div>
-            <div className="auth-logo-text">
-              Campus<span>Care</span>
-            </div>
-          </div>
-          <h1 className="auth-title">Create Account</h1>
-          <p className="auth-subtitle">Join your campus healthcare community</p>
-        </div>
+        <h1>Create Account</h1>
 
-        {error && (
-          <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <p className="error-message">{error}</p>}
 
-        {/* Role Selector */}
+        {/* Role selector */}
         <div className="role-selector">
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-student"
-              name="role"
-              value="student"
-              checked={role === 'student'}
-              onChange={() => handleRoleChange('student')}
-            />
-            <label htmlFor="role-student">
-              <span className="role-icon">🎓</span>
-              <span className="role-name">Student</span>
+          {['student', 'staff', 'doctor'].map((r) => (
+            <label key={r}>
+              <input
+                type="radio"
+                checked={role === r}
+                onChange={() => handleRoleChange(r)}
+              />
+              {r.toUpperCase()}
             </label>
-          </div>
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-staff"
-              name="role"
-              value="staff"
-              checked={role === 'staff'}
-              onChange={() => handleRoleChange('staff')}
-            />
-            <label htmlFor="role-staff">
-              <span className="role-icon">👔</span>
-              <span className="role-name">Staff</span>
-            </label>
-          </div>
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-professor"
-              name="role"
-              value="professor"
-              checked={role === 'professor'}
-              onChange={() => handleRoleChange('professor')}
-            />
-            <label htmlFor="role-professor">
-              <span className="role-icon">📚</span>
-              <span className="role-name">Professor</span>
-            </label>
-          </div>
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-doctor"
-              name="role"
-              value="doctor"
-              checked={role === 'doctor'}
-              onChange={() => handleRoleChange('doctor')}
-            />
-            <label htmlFor="role-doctor">
-              <span className="role-icon">👨‍⚕️</span>
-              <span className="role-name">Doctor</span>
-            </label>
-          </div>
+          ))}
         </div>
-
-        {isDoctor && (
-          <div className="info-box">
-            <span>ℹ️</span>
-            <span>Doctor accounts require email verification before activation.</span>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="fullName" className="form-label">
-              Full Name
-            </label>
-            <input
-              type="text"
-              id="fullName"
-              name="fullName"
-              className="form-input"
-              placeholder="Enter your full name"
-              value={formData.fullName}
-              onChange={handleInputChange}
-              required
-              autoComplete="name"
-            />
-          </div>
+          <input
+            name="fullName"
+            placeholder="Full Name"
+            value={formData.fullName}
+            onChange={handleInputChange}
+            required
+          />
 
-          <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              Gmail Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              className="form-input"
-              placeholder="yourname@gmail.com"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-              autoComplete="email"
-            />
-            <span className="form-hint">Only Gmail accounts are supported</span>
-          </div>
+          <input
+            name="email"
+            placeholder="Gmail address"
+            value={formData.email}
+            onChange={handleInputChange}
+            required
+          />
 
           {!isDoctor && (
-            <div className="form-group">
-              <label htmlFor="branch" className="form-label">
-                Branch / Department
-              </label>
-              <select
-                id="branch"
-                name="branch"
-                className="form-select"
-                value={formData.branch}
-                onChange={handleInputChange}
-                required
-              >
-                <option value="">Select your branch</option>
-                {BRANCHES.map((branch) => (
-                  <option key={branch} value={branch}>
-                    {branch}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              name="branch"
+              value={formData.branch}
+              onChange={handleInputChange}
+              required
+            >
+              <option value="">Select branch</option>
+              {BRANCHES.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
           )}
 
           {isStudent && (
-            <div className="form-group">
-              <label htmlFor="year" className="form-label">
-                Expected Graduation Year
-              </label>
+            <select
+              name="year"
+              value={formData.year}
+              onChange={handleInputChange}
+              required
+            >
+              <option value="">Graduation year</option>
+              {years.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          )}
+
+          {isDoctor && (
+            <>
               <select
-                id="year"
-                name="year"
-                className="form-select"
-                value={formData.year}
+                name="department"
+                value={formData.department}
                 onChange={handleInputChange}
                 required
               >
-                <option value="">Select year</option>
-                {years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
+                <option value="">Department</option>
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
-            </div>
-          )}
-          {isDoctor && (
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="department" className="form-label">
-                  Department
-                </label>
-                <select
-                  id="department"
-                  name="department"
-                  className="form-select"
-                  value={formData.department}
-                  onChange={handleInputChange}
-                  required
-                >
-                  <option value="">Select department</option>
-                  {DEPARTMENTS.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
-              <div className="form-group">
-                <label htmlFor="specialization" className="form-label">
-                  Specialization (Optional)
-                </label>
-                <input
-                  type="text"
-                  id="specialization"
-                  name="specialization"
-                  className="form-input"
-                  placeholder="e.g., Sports Medicine"
-                  value={formData.specialization}
-                  onChange={handleInputChange}
-                  autoComplete="off"
-                />
-              </div>
-            </div>
+              <input
+                name="specialization"
+                placeholder="Specialization (optional)"
+                value={formData.specialization}
+                onChange={handleInputChange}
+              />
+            </>
           )}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                className="form-input"
-                placeholder="Create a strong password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-                autoComplete="new-password"
-              />
-            </div>
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={handleInputChange}
+            required
+          />
 
-            <div className="form-group">
-              <label htmlFor="confirmPassword" className="form-label">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                className="form-input"
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                required
-                autoComplete="new-password"
-              />
-            </div>
-          </div>
+          <input
+            type="password"
+            name="confirmPassword"
+            placeholder="Confirm Password"
+            value={formData.confirmPassword}
+            onChange={handleInputChange}
+            required
+          />
 
-          <button type="submit" className="btn btn-primary">
-            Create Account
-          </button>
+          <button type="submit">Create Account</button>
         </form>
 
-        <div className="auth-footer">
-          Already have an account?{' '}
-          <Link to="/" className="auth-link">
-            Sign in
-          </Link>
-        </div>
+        <p>
+          Already have an account? <Link to="/">Sign in</Link>
+        </p>
       </div>
     </div>
   );
