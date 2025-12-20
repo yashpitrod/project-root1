@@ -1,23 +1,17 @@
-// client/src/auth/firebase.js
-
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
-/**
- * Firebase configuration
- * These values come from Firebase Console → Project Settings → Web App
- */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyBgic8GeuGrB6Nl68sbbYxYDsoR0sB-xD4",
+  authDomain: "falcon-nitr-dispensary.firebaseapp.com",
+  projectId: "falcon-nitr-dispensary",
+  storageBucket: "falcon-nitr-dispensary.firebasestorage.app",
+  messagingSenderId: "171637549520",
+  appId: "1:171637549520:web:f6abe54fbacbd7145571d5"
 };
 
-// Initialize Firebase app (only once)
+// ✅ Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication
+// ✅ ONLY Auth (no analytics)
 export const auth = getAuth(app);
