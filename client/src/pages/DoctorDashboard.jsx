@@ -1,105 +1,204 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import '../styles/auth.css';
+import { useState } from "react";
+import "../styles/DoctorDashboard.css";
 
 const DoctorDashboard = () => {
-  const [isAvailable, setIsAvailable] = useState(true);
+  const doctorName = "Dr. Amar Sharma";
+
+  const [available, setAvailable] = useState(true);
+  const [activeMenu, setActiveMenu] = useState("dashboard");
+
+  const [appointments, setAppointments] = useState([
+    { id: 1, name: "Rohit Kumar", time: "10:30 AM", issue: "Chest Pain", age: 42, gender: "Male", status: "pending" },
+    { id: 2, name: "Anita Singh", time: "11:15 AM", issue: "Blood Pressure Check", age: 38, gender: "Female", status: "pending" },
+    { id: 3, name: "Rahul Mehta", time: "12:00 PM", issue: "Diabetes Follow-up", age: 55, gender: "Male", status: "pending" },
+    { id: 4, name: "Priya Patel", time: "02:30 PM", issue: "Cardiac Review", age: 47, gender: "Female", status: "approved" },
+    { id: 5, name: "Vikram Joshi", time: "03:45 PM", issue: "ECG Report", age: 61, gender: "Male", status: "pending" },
+    { id: 6, name: "Sneha Reddy", time: "04:20 PM", issue: "Post-op Check", age: 34, gender: "Female", status: "approved" }
+  ]);
+
+  const [settings, setSettings] = useState({
+    notifications: true,
+    autoConfirm: false
+  });
+
+  const updateStatus = (id, status) => {
+    setAppointments(prev =>
+      prev.map(a => (a.id === id ? { ...a, status } : a))
+    );
+  };
+
+  const toggleSetting = (key) => {
+    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const pendingCount = appointments.filter(a => a.status === "pending").length;
+  const approvedCount = appointments.filter(a => a.status === "approved").length;
+
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
 
   return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div className="dashboard-logo">
-          <div className="dashboard-logo-icon">🏥</div>
-          <span>Campus<span>Care</span></span>
+    <div className="dashboard">
+
+      {/* SIDEBAR */}
+      <aside className="sidebar">
+        <div className="logo">
+          <div className="logo-icon">🩺</div>
+          <h2>CampusCare</h2>
+          <p className="logo-sub">Doctor Portal</p>
         </div>
-        <nav className="dashboard-nav">
-          <Link to="/doctor" className="nav-link active">Dashboard</Link>
-          <Link to="/doctor" className="nav-link">Patients</Link>
-          <Link to="/doctor" className="nav-link">Schedule</Link>
-          <Link to="/" className="btn-logout">Logout</Link>
+
+        <div className="doctor-info">
+          <div className="avatar">AS</div>
+          <h3>{doctorName}</h3>
+          <p className="specialty">Senior Cardiologist</p>
+
+          <div
+            className={`status-badge ${available ? "online" : "offline"}`}
+            onClick={() => setAvailable(!available)}
+          >
+            ● {available ? "Available" : "Unavailable"}
+          </div>
+        </div>
+
+        <nav className="menu">
+          <button
+            className={`menu-item ${activeMenu === "dashboard" ? "active" : ""}`}
+            onClick={() => setActiveMenu("dashboard")}
+          >
+            📊 Dashboard
+          </button>
+
+          <button
+            className={`menu-item ${activeMenu === "appointments" ? "active" : ""}`}
+            onClick={() => setActiveMenu("appointments")}
+          >
+            📅 Appointments
+            {pendingCount > 0 && <span className="badge">{pendingCount}</span>}
+          </button>
+
+          <button
+            className={`menu-item ${activeMenu === "patients" ? "active" : ""}`}
+            onClick={() => setActiveMenu("patients")}
+          >
+            👥 Patients
+          </button>
+
+          <button
+            className={`menu-item ${activeMenu === "settings" ? "active" : ""}`}
+            onClick={() => setActiveMenu("settings")}
+          >
+            ⚙️ Settings
+          </button>
         </nav>
-      </header>
 
-      <main className="dashboard-content">
-        <div className="dashboard-welcome">
-          <h1>Good morning, Dr. Smith! 👨‍⚕️</h1>
-          <p>Here's your practice overview for today</p>
+        <div className="sidebar-footer">
+          <button
+            className={`availability-toggle ${available ? "on" : "off"}`}
+            onClick={() => setAvailable(!available)}
+          >
+            {available ? "● Go Offline" : "● Go Online"}
+          </button>
         </div>
+      </aside>
 
-        <div className="dashboard-grid">
-          {/* Availability Card */}
-          <div className="dashboard-card">
-            <div className="card-header">
-              <div className="card-icon green">✅</div>
-              <span className={`status-badge ${isAvailable ? 'online' : 'offline'}`}>
-                <span className="status-dot"></span>
-                {isAvailable ? 'Available' : 'Unavailable'}
-              </span>
-            </div>
-            <h3 className="card-title">Your Availability</h3>
-            <p className="card-description" style={{ marginBottom: '16px' }}>
-              Toggle your availability status for students
-            </p>
-            <div className="toggle-container">
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={isAvailable}
-                  onChange={(e) => setIsAvailable(e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-              <span className="toggle-label">
-                {isAvailable ? 'Currently accepting patients' : 'Not accepting patients'}
-              </span>
-            </div>
+      {/* MAIN CONTENT */}
+      <main className="main-content">
+
+        <header className="header">
+          <div>
+            <h1>Welcome, Doctor</h1>
+            <p className="date">{today}</p>
           </div>
 
-          {/* Queue Count Card */}
-          <div className="dashboard-card">
-            <div className="card-header">
-              <div className="card-icon blue">👥</div>
+          <div className="stats">
+            <div>
+              <strong>{appointments.length}</strong>
+              <span>Appointments</span>
             </div>
-            <h3 className="card-title">Patients in Queue</h3>
-            <div className="card-value">7</div>
-            <p className="card-description">Average wait time: ~20 minutes</p>
-            <div className="card-action">
-              <button className="card-btn">
-                Manage Queue →
-              </button>
+            <div>
+              <strong>{pendingCount}</strong>
+              <span>Pending</span>
+            </div>
+            <div>
+              <strong>{approvedCount}</strong>
+              <span>Approved</span>
             </div>
           </div>
+        </header>
 
-          {/* Today's Appointments Card */}
-          <div className="dashboard-card">
-            <div className="card-header">
-              <div className="card-icon orange">📅</div>
-            </div>
-            <h3 className="card-title">Today's Appointments</h3>
-            <div className="card-value">12</div>
-            <p className="card-description">4 completed, 8 remaining</p>
-            <div className="card-action">
-              <button className="card-btn">
-                View Schedule →
-              </button>
-            </div>
-          </div>
+        {activeMenu === "dashboard" && (
+          <section className="page">
+            <h2>Good day 👨‍⚕️</h2>
+            <p>You have {pendingCount} pending appointments today.</p>
+          </section>
+        )}
 
-          {/* Patients Seen Card */}
-          <div className="dashboard-card">
-            <div className="card-header">
-              <div className="card-icon purple">📊</div>
-            </div>
-            <h3 className="card-title">This Week</h3>
-            <div className="card-value">45</div>
-            <p className="card-description">Patients seen this week</p>
-            <div className="card-action">
-              <button className="card-btn">
-                View Reports →
-              </button>
-            </div>
-          </div>
-        </div>
+        {activeMenu === "appointments" && (
+          <section className="page">
+            {appointments.map(app => (
+              <div key={app.id} className="appointment-card">
+                <div>
+                  <h4>{app.name}</h4>
+                  <p>{app.issue}</p>
+                  <small>{app.time}</small>
+                </div>
+
+                <div className="actions">
+                  {app.status === "pending" ? (
+                    <>
+                      <button
+                        className="btn approve"
+                        onClick={() => updateStatus(app.id, "approved")}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="btn reject"
+                        onClick={() => updateStatus(app.id, "rejected")}
+                      >
+                        Reject
+                      </button>
+                    </>
+                  ) : (
+                    <span className={`tag ${app.status}`}>
+                      {app.status}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {activeMenu === "settings" && (
+          <section className="page">
+            <h2>Settings</h2>
+
+            <label className="setting">
+              <span>Email Notifications</span>
+              <input
+                type="checkbox"
+                checked={settings.notifications}
+                onChange={() => toggleSetting("notifications")}
+              />
+            </label>
+
+            <label className="setting">
+              <span>Auto Confirm Appointments</span>
+              <input
+                type="checkbox"
+                checked={settings.autoConfirm}
+                onChange={() => toggleSetting("autoConfirm")}
+              />
+            </label>
+          </section>
+        )}
+
       </main>
     </div>
   );
