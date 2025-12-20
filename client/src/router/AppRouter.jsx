@@ -5,16 +5,18 @@ import StudentDashboard from '../pages/StudentDashboard';
 import DoctorDashboard from '../pages/DoctorDashboard';
 
 const AppRouter = () => {
+  
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/student" element={<StudentDashboard />} />
+        <Route path="/student" element={
+          <StudentDashboard />} />
         <Route path="/doctor" element={<DoctorDashboard />} />
       </Routes>
     </BrowserRouter>
   );
 };
 
-export default AppRouter;
+export default AppRouter;  
