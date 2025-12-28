@@ -9,14 +9,14 @@ const AppRouter = () => {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/login" element={<Login />} />
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/student" element={
-          <StudentDashboard />} />
+        <Route path="/student" element={<StudentDashboard />} />
         <Route path="/doctor" element={<DoctorDashboard />} />
       </Routes>
     </BrowserRouter>
   );
 };
 
-export default AppRouter;  
+export default AppRouter;

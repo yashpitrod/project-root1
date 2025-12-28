@@ -1,165 +1,55 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import '../styles/auth.css';
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
 import { auth } from "./firebase";
 
-const BRANCHES = [
-  // Engineering
-  'Computer Science & Engineering',
-  'Information Technology',
-  'Electronics & Communication',
-  'Electrical Engineering',
-  'Electrical & Electronics',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Chemical Engineering',
-  'Aerospace Engineering',
-  'Automobile Engineering',
-  'Biomedical Engineering',
-  'Biotechnology',
-  'Environmental Engineering',
-  'Industrial Engineering',
-  'Instrumentation Engineering',
-  'Marine Engineering',
-  'Mechatronics',
-  'Metallurgical Engineering',
-  'Mining Engineering',
-  'Petroleum Engineering',
-  'Production Engineering',
-  'Robotics Engineering',
-  'Textile Engineering',
-  // Science
-  'Physics',
-  'Chemistry',
-  'Mathematics',
-  'Microbiology',
-  'Biochemistry',
-  'Data Science',
-  'Economics',
-  'English Literature',
-  'Accounting & Finance',
-  // Others
-  'Architecture',
-  'Other',
-];
-
-const DEPARTMENTS = [
-  'General Medicine',
-  'Pediatrics',
-  'Dermatology',
-  'Psychiatry',
-  'Orthopedics',
-  'Gynecology',
-  'ENT',
-  'Ophthalmology',
-  'Dental',
-  'Physiotherapy',
-];
-
 const Register = () => {
-  const [role, setRole] = useState('student');
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    branch: '',
-    year: '',
-    department: '',
-    specialization: '',
-    password: '',
-    confirmPassword: '',
+    fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    role: "student",
   });
-  const [error, setError] = useState('');
 
-  const handleRoleChange = (newRole) => {
-    setRole(newRole);
-    setFormData({
-      fullName: '',
-      email: '',
-      branch: '',
-      year: '',
-      department: '',
-      specialization: '',
-      password: '',
-      confirmPassword: '',
-    });
-    setError('');
-  };
-
-  const verifyDoctorEmail = async (email) => {
-    const res = await fetch("http://localhost:5000/api/auth/verify-doctor-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-
-    const data = await res.json();
-    return data.valid;
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Clear email error when typing
-    if (name === 'email') {
-      setError('');
-    }
-  };
+  const [error, setError] = useState("");
 
   const validateEmail = (email) => {
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
     return gmailRegex.test(email);
   };
 
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
-    const {
-      email,
-      password,
-      confirmPassword,
-      fullName,
-      branch,
-      year,
-      department,
-      specialization,
-    } = formData;
-
-    // Validate Gmail
-    if (!validateEmail(email)) {
-      setError('Please use a valid Gmail address (@gmail.com)');
+    if (!validateEmail(formData.email)) {
+      setError("Please use a valid Gmail address (@gmail.com)");
       return;
     }
 
-    // Validate password match
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
       return;
     }
 
     try {
-      //for checking wheather it is a doctor or not 
-      if (role === "doctor") {
-        const isValid = await verifyDoctorEmail(email);
-
-        if (!isValid) {
-          alert("Unauthorized doctor email");
-          return;
-        }
-      }
-
-      // 1️⃣ Firebase signup
       const userCred = await createUserWithEmailAndPassword(
         auth,
-        email,
-        password
+        formData.email,
+        formData.password
       );
 
+      // No email verification, just send user info to backend
       const token = await userCred.user.getIdToken();
-
-      // 2️⃣ Save user to backend
       await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
         headers: {
@@ -167,33 +57,20 @@ const Register = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          role,
-          fullName,
-          email,
-          branch: role === 'doctor' ? null : branch,
-          year: role === 'student' ? year : null,
-          department: role === 'doctor' ? department : null,
-          specialization: role === 'doctor' ? specialization : null,
+          fullName: formData.fullName,
+          role: formData.role,
         }),
       });
 
-      console.log("Registration successful");
-
+      navigate("/login");
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Registration failed");
+      setError(err.message);
     }
   };
 
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 8 }, (_, i) => currentYear + i);
-
-  const isDoctor = role === 'doctor';
-  const isStudent = role === 'student';
-
   return (
     <div className="auth-container">
+      {/* 🔥 THIS CLASS IS REQUIRED */}
       <div className="auth-card register-card">
         <div className="auth-header">
           <div className="auth-logo">
@@ -203,7 +80,9 @@ const Register = () => {
             </div>
           </div>
           <h1 className="auth-title">Create Account</h1>
-          <p className="auth-subtitle">Join your campus healthcare community</p>
+          <p className="auth-subtitle">
+            Join your campus healthcare system
+          </p>
         </div>
 
         {error && (
@@ -213,239 +92,81 @@ const Register = () => {
           </div>
         )}
 
-        {/* Role Selector */}
-        <div className="role-selector">
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-student"
-              name="role"
-              value="student"
-              checked={role === 'student'}
-              onChange={() => handleRoleChange('student')}
-            />
-            <label htmlFor="role-student">
-              <span className="role-icon">🎓</span>
-              <span className="role-name">Student</span>
-            </label>
-          </div>
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-staff"
-              name="role"
-              value="staff"
-              checked={role === 'staff'}
-              onChange={() => handleRoleChange('staff')}
-            />
-            <label htmlFor="role-staff">
-              <span className="role-icon">👔</span>
-              <span className="role-name">Staff</span>
-            </label>
-          </div>
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-professor"
-              name="role"
-              value="professor"
-              checked={role === 'professor'}
-              onChange={() => handleRoleChange('professor')}
-            />
-            <label htmlFor="role-professor">
-              <span className="role-icon">📚</span>
-              <span className="role-name">Professor</span>
-            </label>
-          </div>
-          <div className="role-option">
-            <input
-              type="radio"
-              id="role-doctor"
-              name="role"
-              value="doctor"
-              checked={role === 'doctor'}
-              onChange={() => handleRoleChange('doctor')}
-            />
-            <label htmlFor="role-doctor">
-              <span className="role-icon">👨‍⚕️</span>
-              <span className="role-name">Doctor</span>
-            </label>
-          </div>
-        </div>
-
-        {isDoctor && (
-          <div className="info-box">
-            <span>ℹ️</span>
-            <span>Doctor accounts require email verification before activation.</span>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="fullName" className="form-label">
-              Full Name
-            </label>
+            <label className="form-label">Full Name</label>
             <input
-              type="text"
-              id="fullName"
-              name="fullName"
               className="form-input"
-              placeholder="Enter your full name"
+              name="fullName"
+              placeholder="Your name"
               value={formData.fullName}
-              onChange={handleInputChange}
+              onChange={handleChange}
               required
-              autoComplete="name"
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              Gmail Address
-            </label>
+            <label className="form-label">Email</label>
             <input
-              type="email"
-              id="email"
-              name="email"
               className="form-input"
-              placeholder="yourname@gmail.com"
+              type="email"
+              name="email"
+              placeholder="you@gmail.com"
               value={formData.email}
-              onChange={handleInputChange}
+              onChange={handleChange}
               required
-              autoComplete="email"
             />
-            <span className="form-hint">Only Gmail accounts are supported</span>
           </div>
 
-          {!isDoctor && (
-            <div className="form-group">
-              <label htmlFor="branch" className="form-label">
-                Branch / Department
-              </label>
-              <select
-                id="branch"
-                name="branch"
-                className="form-select"
-                value={formData.branch}
-                onChange={handleInputChange}
-                required
-              >
-                <option value="">Select your branch</option>
-                {BRANCHES.map((branch) => (
-                  <option key={branch} value={branch}>
-                    {branch}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {isStudent && (
-            <div className="form-group">
-              <label htmlFor="year" className="form-label">
-                Expected Graduation Year
-              </label>
-              <select
-                id="year"
-                name="year"
-                className="form-select"
-                value={formData.year}
-                onChange={handleInputChange}
-                required
-              >
-                <option value="">Select year</option>
-                {years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {isDoctor && (
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="department" className="form-label">
-                  Department
-                </label>
-                <select
-                  id="department"
-                  name="department"
-                  className="form-select"
-                  value={formData.department}
-                  onChange={handleInputChange}
-                  required
-                >
-                  <option value="">Select department</option>
-                  {DEPARTMENTS.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="specialization" className="form-label">
-                  Specialization (Optional)
-                </label>
-                <input
-                  type="text"
-                  id="specialization"
-                  name="specialization"
-                  className="form-input"
-                  placeholder="e.g., Sports Medicine"
-                  value={formData.specialization}
-                  onChange={handleInputChange}
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                className="form-input"
-                placeholder="Create a strong password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-                autoComplete="new-password"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="confirmPassword" className="form-label">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                className="form-input"
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                required
-                autoComplete="new-password"
-              />
-            </div>
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              className="form-input"
+              type="password"
+              name="password"
+              placeholder="Create password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
           </div>
 
-          <button type="submit" className="btn btn-primary">
+          <div className="form-group">
+            <label className="form-label">Confirm Password</label>
+            <input
+              className="form-input"
+              type="password"
+              name="confirmPassword"
+              placeholder="Confirm password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Role</label>
+            <select
+              className="form-select"
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              required
+            >
+              <option value="student">Student</option>
+              <option value="staff">Staff</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <button className="btn btn-primary" type="submit">
             Create Account
           </button>
         </form>
 
         <div className="auth-footer">
-          Already have an account?{' '}
-          <Link to="/" className="auth-link">
+          Already have an account?{" "}
+          <Link to="/login" className="auth-link">
             Sign in
           </Link>
         </div>
