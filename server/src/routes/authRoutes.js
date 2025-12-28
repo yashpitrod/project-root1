@@ -6,12 +6,12 @@ const router = express.Router();
 
 // 🔒 Prebuilt doctor email list
 const allowedDoctors = [
-  "champak.bhattacharyya@nitrkl.ac.in",
-  "sameer.patnaik@nitrkl.ac.in",
-  "soumyaranjan.behera@nitrkl.ac.in",
-  "anirban.ghosh@nitrkl.ac.in",
-  "savitri.munda@nitrkl.ac.in",
-  "kapil.meena@nitrkl.ac.in"
+  "champak.bhattacharyya@gmail.com",
+  "sameer.patnaik@gmail.com",
+  "soumyaranjan.behera@gmail.com",
+  "anirban.ghosh@gmail.com",
+  "savitri.munda@gmail.com",
+  "kapil.meena@gmail.com"
 ];
 
 /**
@@ -26,17 +26,23 @@ router.post("/register", verifyToken, async (req, res) => {
       return res.json(user); // returning user
     }
 
-    // 2. Auto-detect role
+    // 2. Determine role
     const email = req.email.toLowerCase();
     const isDoctor = allowedDoctors.includes(email);
-
-    const role = isDoctor ? "doctor" : "student";
+    let role;
+    if (isDoctor) {
+      role = "doctor";
+    } else {
+      // Only allow valid roles from frontend (no admin signup)
+      const allowedRoles = ["student", "staff"];
+      role = allowedRoles.includes(req.body.role) ? req.body.role : "student";
+    }
 
     // 3. Create user
     user = await User.create({
       uid: req.uid,
       email,
-      name: req.body.name || "User",
+      name: req.body.fullName || "User",
       role,
       isApproved: isDoctor // doctors only if whitelisted
     });
@@ -51,57 +57,26 @@ router.post("/register", verifyToken, async (req, res) => {
  * Get logged-in user
  */
 router.get("/me", verifyToken, async (req, res) => {
-  const user = await User.findOne({ uid: req.uid }).select("-__v");
+  let user = await User.findOne({ uid: req.uid }).select("-__v");
+  const email = req.email.toLowerCase();
+  const isDoctor = allowedDoctors.includes(email);
+  // If user exists but should be doctor, update role
+  if (user && isDoctor && user.role !== "doctor") {
+    user.role = "doctor";
+    user.isApproved = true;
+    await user.save();
+  }
+  if (!user) {
+    // Auto-create user in MongoDB if not found, using Firebase token info
+    user = await User.create({
+      uid: req.uid,
+      email: req.email,
+      name: req.email.split("@")[0], // fallback to email prefix as name
+      role: isDoctor ? "doctor" : "student", // assign doctor if whitelisted
+      isApproved: isDoctor
+    });
+  }
   res.json(user);
 });
 
 export default router;
-
-// import express from "express";
-// import { verifyToken } from "../middlewares/verifyToken.js";
-// import User from "../models/User.js";
-
-// const router = express.Router();
-
-// router.post("/register", verifyToken, async (req, res) => {
-//     const { role, fullName, branch, year } = req.body;
-
-//     await User.create({
-//         uid: req.uid,
-//         role,
-//         fullName,
-//         branch,
-//         year,
-//     });
-
-//     res.json({ success: true });
-// });
-
-// router.post("/verify-doctor-email", (req, res) => {
-//     const allowedDoctors = [
-//         "champak.bhattacharyya@nitrkl.ac.in",
-//         "sameer.patnaik@nitrkl.ac.in",
-//         "soumyaranjan.behera@nitrkl.ac.in",
-//         "anirban.ghosh@nitrkl.ac.in",
-//         "savitri.munda@nitrkl.ac.in",
-//         "kapil.meena@nitrkl.ac.in"
-//     ];
-
-//     const { email } = req.body;
-
-//     if (!email) {
-//         return res.status(400).json({ valid: false });
-//     }
-
-//     const isValid = allowedDoctors.includes(email.toLowerCase());
-
-//     res.json({ valid: isValid });
-// });
-
-
-// router.get("/me", verifyToken, async (req, res) => {
-//     const user = await User.findOne({ uid: req.uid });
-//     res.json(user);
-// });
-
-// export default router;

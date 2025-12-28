@@ -7,7 +7,6 @@ import { auth } from "./firebase";
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student'); // UI only
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -43,17 +42,22 @@ const Login = () => {
         },
       });
 
-      if (!res.ok) throw new Error("Failed to fetch user data");
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to fetch user data");
+      }
 
       const data = await res.json();
 
       // 3️⃣ Role-based redirect (backend decides)
       if (data.role === "doctor") navigate("/doctor");
+      else if (data.role === "staff") navigate("/staff");
+      else if (data.role === "admin") navigate("/admin");
       else navigate("/student");
 
     } catch (err) {
       console.error(err);
-      setError("Invalid email or password");
+      setError(err.message || "Invalid email or password");
     }
   };
 
@@ -79,23 +83,6 @@ const Login = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="role" className="form-label">
-              I am a
-            </label>
-            <select
-              id="role"
-              className="form-select"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
-              <option value="student">Student</option>
-              <option value="staff">Staff</option>
-              <option value="professor">Professor</option>
-              <option value="doctor">Doctor</option>
-            </select>
-          </div>
-
           <div className="form-group">
             <label htmlFor="email" className="form-label">
               Gmail Address

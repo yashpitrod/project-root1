@@ -1,54 +1,50 @@
-// import admin from "../config/firebaseAdmin.js";
+import admin from "firebase-admin";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// export const verifyToken = async (req, res, next) => {
-//   try {
-//     const authHeader = req.headers.authorization;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const serviceAccountPath = path.join(__dirname, "../config/firebaseServiceAccount.json");
+const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
 
-//     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-//       return res.status(401).json({ message: "No token provided" });
-//     }
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
 
-//     const token = authHeader.split(" ")[1];
+export const verifyToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
 
-//     const decodedToken = await admin.auth().verifyIdToken(token);
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "No token provided" });
+    }
 
-//     req.uid = decodedToken.uid;
-//     req.email = decodedToken.email;
+    const token = authHeader.split(" ")[1];
 
-//     next();
-//   } catch (error) {
-//     return res.status(401).json({ message: "Invalid or expired token" });
-//   }
-// };
+    const decoded = await admin.auth().verifyIdToken(token);
 
-// // import admin from "firebase-admin";
+    // attach identity to request
+    req.uid = decoded.uid;
+    req.email = decoded.email;
 
-// // admin.initializeApp({
-// //   credential: admin.credential.cert(
-// //     JSON.parse(process.env.FIREBASE_SERVICE_KEY)
-// //   ),
-// // });
+    next();
+  } catch (error) {
+    console.error("Auth error:", error);
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+};
 
-// // export const verifyToken = async (req, res, next) => {
-// //   const token = req.headers.authorization?.split(" ")[1];
-// //   if (!token) return res.status(401).json({ error: "No token" });
-
-// //   try {
-// //     const decoded = await admin.auth().verifyIdToken(token);
-// //     req.uid = decoded.uid;
-// //     next();
-// //   } catch {
-// //     res.status(401).json({ error: "Invalid token" });
-// //   }
-// // };
 
 // ⚠️ TEMPORARY AUTH BYPASS FOR LOCAL DEVELOPMENT
 // REMOVE THIS FILE CONTENT WHEN FIREBASE SERVICE ACCOUNT IS AVAILABLE
 
-export const verifyToken = async (req, res, next) => {
-  // Fake logged-in user (student by default)
-  req.uid = "temp-uid-123";
-  req.email = "test.student@gmail.com";
+// export const verifyToken = async (req, res, next) => {
+//   // Fake logged-in user (student by default)
+//   req.uid = "temp-uid-123";
+//   req.email = "test.student@gmail.com";
 
-  next();
-};
+//   next();
+// };
