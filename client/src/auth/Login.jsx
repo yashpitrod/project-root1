@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import '../styles/auth.css';
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth } from "../auth/firebase";
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -49,6 +49,8 @@ const Login = () => {
 
       const data = await res.json();
 
+      /* ✅ STORE USER FOR PROFILE PAGE */
+      localStorage.setItem("user", JSON.stringify(data));
       // 3️⃣ Role-based redirect (backend decides)
       if (data.role === "doctor") navigate("/doctor");
       else if (data.role === "staff") navigate("/staff");

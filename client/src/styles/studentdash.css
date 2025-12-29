@@ -327,6 +327,7 @@
 .time-slot-selection {
   position: relative;
 }
+
 .time-slot-dropdown {
   width: 100%;
   padding: 14px 16px;
@@ -345,11 +346,13 @@
   padding-right: 44px;
   position: relative;
 }
+
 .time-slot-dropdown option {
   background: white;
   color: #1a1a1a;
   padding: 10px;
 }
+
 .time-slot-dropdown:focus {
   outline: none;
   border-color: #22c55e;
@@ -540,9 +543,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -646,4 +652,53 @@
     align-items: flex-start;
     gap: 12px;
   }
+}
+
+/* Header Right Controls */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Profile Icon Button */
+.profile-icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.profile-icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.profile-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Logout Button */
+.logout-text-btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: none;
+  background: #ef4444;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-text-btn:hover {
+  background: #dc2626;
 }

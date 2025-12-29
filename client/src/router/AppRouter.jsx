@@ -3,9 +3,10 @@ import Login from '../auth/Login';
 import Register from '../auth/Register';
 import StudentDashboard from '../pages/StudentDashboard';
 import DoctorDashboard from '../pages/DoctorDashboard';
+import StudentProfile from '../pages/StudentProfile';
 
 const AppRouter = () => {
-  
+
   return (
     <BrowserRouter>
       <Routes>
@@ -14,6 +15,7 @@ const AppRouter = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/student" element={<StudentDashboard />} />
         <Route path="/doctor" element={<DoctorDashboard />} />
+        <Route path="/student/profile" element={<StudentProfile />} />
       </Routes>
     </BrowserRouter>
   );
