@@ -1,47 +1,48 @@
 import Request from "../models/Request.js";
-import User from "../models/User.js";
-import { summarizeText } from "../config/gemini.js";
-import { allocateSlot } from "../utils/slotAllocator.js";
+import { translateToEnglish } from "../utils/translate.js";
 
 /**
- * Student submits a health request
+ * STUDENT: Create appointment request
  */
 export const createRequest = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { problem, doctorId, timeSlot, alreadyTranslated } = req.body;
 
-    if (!text) {
-      return res.status(400).json({ message: "Problem text is required" });
+    if (!problem || !doctorId || !timeSlot) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // 1. Get logged-in user
-    const user = await User.findOne({ uid: req.uid });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    // Ensure English text is always saved
+    const finalEnglishText = alreadyTranslated
+      ? problem
+      : await translateToEnglish(problem);
 
-    // 2. Gemini: translate + summarize
-    const summary = await summarizeText(text);
-
-    // 3. Allocate slot (simple logic)
-    const slotTime = await allocateSlot();
-
-    // 4. Save request
     const request = await Request.create({
-      user: user._id,
-      originalText: text,
-      englishSummary: summary,
-      slotTime,
-      status: "scheduled"
+      studentId: req.user.id,
+      doctorId,
+      problemEnglish: finalEnglishText,
+      timeSlot,
     });
 
-    res.json({
-      message: "Request submitted successfully",
-      request
-    });
-
+    res.status(201).json(request);
   } catch (error) {
-    console.error(error);
+    console.error("Create Request Error:", error);
     res.status(500).json({ message: "Failed to create request" });
+  }
+};
+
+/**
+ * DOCTOR: Get only their appointments
+ */
+export const getDoctorRequests = async (req, res) => {
+  try {
+    const requests = await Request.find({
+      doctorId: req.user.id,
+    }).populate("studentId", "name email");
+
+    res.status(200).json(requests);
+  } catch (error) {
+    console.error("Fetch Doctor Requests Error:", error);
+    res.status(500).json({ message: "Failed to fetch requests" });
   }
 };

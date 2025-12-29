@@ -2,34 +2,35 @@ import mongoose from "mongoose";
 
 const requestSchema = new mongoose.Schema(
   {
-    user: {
+    studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      required: true,
     },
 
-    originalText: {
+    doctorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    problemEnglish: {
       type: String,
-      required: true
+      required: true,
     },
 
-    englishSummary: {
+    timeSlot: {
       type: String,
-      required: true
-    },
-
-    slotTime: {
-      type: Date
+      required: true,
     },
 
     status: {
       type: String,
-      enum: ["pending", "scheduled", "completed"],
-      default: "pending"
-    }
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
   },
   { timestamps: true }
 );
 
-const Request = mongoose.model("Request", requestSchema);
-export default Request;
+export default mongoose.model("Request", requestSchema);

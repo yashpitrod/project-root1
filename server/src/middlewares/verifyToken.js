@@ -5,16 +5,23 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const serviceAccountPath = path.join(__dirname, "../config/firebaseServiceAccount.json");
-const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+
+const serviceAccountPath = path.join(
+  __dirname,
+  "../config/firebaseServiceAccount.json"
+);
+
+const serviceAccount = JSON.parse(
+  fs.readFileSync(serviceAccountPath, "utf8")
+);
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.cert(serviceAccount),
   });
 }
 
-export const verifyToken = async (req, res, next) => {
+const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -23,12 +30,14 @@ export const verifyToken = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-
     const decoded = await admin.auth().verifyIdToken(token);
 
-    // attach identity to request
-    req.uid = decoded.uid;
-    req.email = decoded.email;
+    // ✅ Attach user info
+    req.user = {
+      id: decoded.uid,
+      email: decoded.email,
+      role: decoded.role || "student",
+    };
 
     next();
   } catch (error) {
@@ -37,14 +46,4 @@ export const verifyToken = async (req, res, next) => {
   }
 };
 
-
-// ⚠️ TEMPORARY AUTH BYPASS FOR LOCAL DEVELOPMENT
-// REMOVE THIS FILE CONTENT WHEN FIREBASE SERVICE ACCOUNT IS AVAILABLE
-
-// export const verifyToken = async (req, res, next) => {
-//   // Fake logged-in user (student by default)
-//   req.uid = "temp-uid-123";
-//   req.email = "test.student@gmail.com";
-
-//   next();
-// };
+export default verifyToken;

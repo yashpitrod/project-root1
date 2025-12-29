@@ -1,25 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "../styles/DoctorDashboard.css";
 
 const DoctorDashboard = () => {
-  const doctorName = "Dr. Amar Sharma";
-
+  const [doctor, setDoctor] = useState(null);
+  const [appointments, setAppointments] = useState([]);
   const [available, setAvailable] = useState(true);
   const [activeMenu, setActiveMenu] = useState("dashboard");
-
-  const [appointments, setAppointments] = useState([
-    { id: 1, name: "Rohit Kumar", time: "10:30 AM", issue: "Chest Pain", age: 42, gender: "Male", status: "pending" },
-    { id: 2, name: "Anita Singh", time: "11:15 AM", issue: "Blood Pressure Check", age: 38, gender: "Female", status: "pending" },
-    { id: 3, name: "Rahul Mehta", time: "12:00 PM", issue: "Diabetes Follow-up", age: 55, gender: "Male", status: "pending" },
-    { id: 4, name: "Priya Patel", time: "02:30 PM", issue: "Cardiac Review", age: 47, gender: "Female", status: "approved" },
-    { id: 5, name: "Vikram Joshi", time: "03:45 PM", issue: "ECG Report", age: 61, gender: "Male", status: "pending" },
-    { id: 6, name: "Sneha Reddy", time: "04:20 PM", issue: "Post-op Check", age: 34, gender: "Female", status: "approved" }
-  ]);
 
   const [settings, setSettings] = useState({
     notifications: true,
     autoConfirm: false
   });
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/requests/doctor", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(res => res.json())
+      .then(data => setAppointments(data));
+  }, []);
 
   const updateStatus = (id, status) => {
     setAppointments(prev =>
