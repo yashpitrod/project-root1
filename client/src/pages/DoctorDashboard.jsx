@@ -2,31 +2,50 @@ import { useEffect, useState } from "react";
 import "../styles/DoctorDashboard.css";
 
 const DoctorDashboard = () => {
+
+  // ✅ 1. FIRST declare token
+  const token = localStorage.getItem("token");
+
+  // ✅ 2. THEN states
   const [doctor, setDoctor] = useState(null);
   const [appointments, setAppointments] = useState([]);
-  const [available, setAvailable] = useState(true);
   const [activeMenu, setActiveMenu] = useState("dashboard");
+  const [availability, setAvailability] = useState("available");
 
   const [settings, setSettings] = useState({
     notifications: true,
     autoConfirm: false
   });
 
-  useEffect(() => {
+    useEffect(() => {
+    if (!token) return;
+
     fetch("http://localhost:5000/api/requests/doctor", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     })
       .then(res => res.json())
-      .then(data => setAppointments(data));
-  }, []);
+      .then(data => setAppointments(data))
+      .catch(err => console.error(err));
+
+  }, [token]);
 
   const updateStatus = (id, status) => {
     setAppointments(prev =>
       prev.map(a => (a.id === id ? { ...a, status } : a))
     );
   };
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setDoctor(user);
+      setAvailability(user.availability || "available");
+    }
+  }, []);
+
 
   const toggleSetting = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -42,6 +61,23 @@ const DoctorDashboard = () => {
     year: "numeric"
   });
 
+  const toggleAvailability = async () => {
+    const newStatus = availability === "available" ? "busy" : "available";
+
+    const res = await fetch("http://localhost:5000/api/doctors/status", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ availability: newStatus }),
+    });
+
+    const data = await res.json();
+    setAvailability(data.availability);
+  };
+
+
   return (
     <div className="dashboard">
 
@@ -54,15 +90,17 @@ const DoctorDashboard = () => {
         </div>
 
         <div className="doctor-info">
-          <div className="avatar">AS</div>
-          <h3>{doctorName}</h3>
+          <div className="avatar">
+            {doctor?.name?.split(" ").map(n => n[0]).join("")}
+          </div>
+          <h3 className="doctor-name">{doctor?.name || "Doctor Name"}</h3>
           <p className="specialty">Senior Cardiologist</p>
 
           <div
-            className={`status-badge ${available ? "online" : "offline"}`}
-            onClick={() => setAvailable(!available)}
+            className={`status-badge ${availability === "available" ? "online" : "offline"}`}
+            onClick={toggleAvailability}
           >
-            ● {available ? "Available" : "Unavailable"}
+            ● {availability === "available" ? "Available" : "Unavailable"}
           </div>
         </div>
 
@@ -99,10 +137,10 @@ const DoctorDashboard = () => {
 
         <div className="sidebar-footer">
           <button
-            className={`availability-toggle ${available ? "on" : "off"}`}
-            onClick={() => setAvailable(!available)}
+            className={`availability-toggle ${availability === "available" ? "on" : "off"}`}
+            onClick={toggleAvailability}
           >
-            {available ? "● Go Offline" : "● Go Online"}
+            ● {availability === "available" ? "Go Offline" : "Go Online"}
           </button>
         </div>
       </aside>

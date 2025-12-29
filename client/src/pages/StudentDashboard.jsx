@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { io } from "socket.io-client";
 import '../styles/studentdash.css';
 import doctorChampak from '../assets/doctor-champa.jpg';
 import doctorSameer from '../assets/doctor-sameer.jpg';
@@ -7,7 +10,9 @@ import doctorAnirban from '../assets/blank-profile-picture.jpg';
 import doctorSavitri from '../assets/blank-profile-picture.jpg';
 import doctorKapil from '../assets/blank-profile-picture.jpg';
 
-
+const socket = io("http://localhost:5000", {
+  transports: ["websocket"],
+});
 
 const StudentDashboard = () => {
   const [problem, setProblem] = useState("");
@@ -16,72 +21,59 @@ const StudentDashboard = () => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [appointmentStatus, setAppointmentStatus] = useState(null);
+  const [doctors, setDoctors] = useState([]);
 
   const token = localStorage.getItem("token");
-
-  const doctors = [
-    {
-      id: 1,
-      name: 'Dr. Champak Bhattacharyya',
-      image: doctorChampak,
-      available: true,
-      gender: 'male',
-      email: 'champak.bhattacharyya@gmail.com'
-    },
-    {
-      id: 2,
-      name: 'Dr. Sameer Patnaik',
-      image: doctorSameer,
-      available: true,
-      gender: 'male',
-      email: 'sameer.patnaik@gmail.com'
-    },
-    {
-      id: 3,
-      name: 'Dr. Soumyaranjan Behera',
-      image: doctorSoumya,
-      available: false,
-      gender: 'male',
-      email: 'soumyaranjan.behera@gmail.com'
-    },
-    {
-      id: 4,
-      name: 'Dr. Anirban Ghosh',
-      image: doctorAnirban,
-      available: true,
-      gender: 'male',
-      email: 'anirban.ghosh@gmail.com'
-    },
-    {
-      id: 5,
-      name: 'Dr. Savitri Munda',
-      image: doctorSavitri,
-      available: true,
-      gender: 'female',
-      email: 'savitri.munda@gmail.com'
-    },
-    {
-      id: 6,
-      name: 'Dr. Kapil Meena',
-      image: doctorKapil,
-      available: true,
-      gender: 'male',
-      email: 'kapil.meena@gmail.com'
-    }
-  ];
-
 
   const healthRecord = {
     lastVisit: '15 Dec 2024',
     totalVisits: 7,
   };
 
+  const totalDoctors = doctors.length;
+  const availableDoctors = doctors.filter(
+    (doc) => doc.availability === "available"
+  ).length;
+  const isDispensaryOpen = availableDoctors > 0;
+
   const dispensaryStatus = {
-    doctorsAvailable: 2,
-    totalDoctors: 4,
     inQueue: 5,
-    isOpen: true,
   };
+
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+    }
+  }, [navigate]);
+  useEffect(() => {
+    fetch("http://localhost:5000/api/doctors")
+      .then(res => res.json())
+      .then(data => setDoctors(data))
+      .catch(err => console.error("Failed to load doctors", err));
+  }, []);
+
+  useEffect(() => {
+    socket.on("doctor-status-updated", ({ doctorId, availability }) => {
+      setDoctors((prevDoctors) =>
+        prevDoctors.map((doc) =>
+          doc._id === doctorId
+            ? { ...doc, availability }
+            : doc
+        )
+      );
+    });
+    return () => {
+      socket.off("doctor-status-updated");
+    };
+  }, []);
 
   // Generate time slots with 10-minute intervals (9 AM to 6 PM, excluding 12-1 PM lunch and 3-4 PM break)
   const generateTimeSlots = () => {
@@ -116,10 +108,15 @@ const StudentDashboard = () => {
   const timeSlots = generateTimeSlots();
 
   const handleTranslate = async () => {
+    if (!problem.trim() || translated) return;
+
     try {
       const res = await fetch("http://localhost:5000/api/translate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ text: problem }),
       });
 
@@ -128,14 +125,41 @@ const StudentDashboard = () => {
       if (data.success) {
         setTranslatedText(data.translatedText);
         setTranslated(true);
+      } else {
+        alert("Translation failed");
       }
     } catch (err) {
       console.error(err);
+      alert("Translation error");
     }
   };
 
   const handleSubmit = async () => {
-    const textToSend = translated ? translatedText : problem;
+    let textToSend = problem;
+
+    // Auto-translate if not translated yet
+    if (!translated) {
+      try {
+        const res = await fetch("http://localhost:5000/api/translate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ text: problem }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          textToSend = data.translatedText;
+          setTranslatedText(data.translatedText);
+          setTranslated(true);
+        }
+      } catch (err) {
+        console.error("Auto-translate failed");
+      }
+    }
 
     await fetch("http://localhost:5000/api/requests", {
       method: "POST",
@@ -145,7 +169,7 @@ const StudentDashboard = () => {
       },
       body: JSON.stringify({
         problem: textToSend,
-        alreadyTranslated: translated,
+        alreadyTranslated: true,
         doctorId: selectedDoctor,
         timeSlot: selectedTimeSlot,
       }),
@@ -171,13 +195,27 @@ const StudentDashboard = () => {
           </div>
         </div>
         <div className="header-right">
-          <div className="user-badge">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 21V19C20 16.7909 18.2091 15 16 15H8C5.79086 15 4 16.7909 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
+          {/* Profile Icon */}
+          <button
+            className="profile-icon-btn"
+            onClick={() => navigate("/student/profile")}
+            title="Profile"
+          >
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M4 20C4 16.6863 7.58172 14 12 14C16.4183 14 20 16.6863 20 20"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </svg>
-            <span>Student</span>
-          </div>
+          </button>
+
+          {/* Logout Button */}
+          <button className="logout-text-btn" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </header>
 
@@ -230,16 +268,39 @@ const StudentDashboard = () => {
               <div className="doctors-grid">
                 {doctors.map((doctor) => (
                   <div
-                    key={doctor.id}
-                    className={`doctor-card ${selectedDoctor === doctor.id ? 'selected' : ''} ${!doctor.available ? 'unavailable' : ''}`}
-                    onClick={() => doctor.available && setSelectedDoctor(doctor.id)}
+                    key={doctor._id}
+                    className={`doctor-card ${doctor.availability !== "available" ? "unavailable" : ""
+                      }`}
+                    onClick={() =>
+                      doctor.availability === "available" &&
+                      setSelectedDoctor(doctor._id)
+                    }
                   >
                     <div className="doctor-image">
-                      <img src={doctor.image} alt={doctor.name} />
+                      <img
+                        src={
+                          doctor.email.includes("champak") ? doctorChampak :
+                            doctor.email.includes("sameer") ? doctorSameer :
+                              doctor.email.includes("soumyaranjan") ? doctorSoumya :
+                                doctor.email.includes("anirban") ? doctorAnirban :
+                                  doctor.email.includes("savitri") ? doctorSavitri :
+                                    doctorKapil
+                        }
+                        alt={doctor.name}
+                      />
                     </div>
+
                     <h4>{doctor.name}</h4>
-                    <span className={`availability ${doctor.available ? 'available' : 'not-available'}`}>
-                      {doctor.available ? 'Available' : 'Unavailable'}
+
+                    <span
+                      className={`availability ${doctor.availability === "available"
+                        ? "available"
+                        : "not-available"
+                        }`}
+                    >
+                      {doctor.availability === "available"
+                        ? "Available"
+                        : "Unavailable"}
                     </span>
                   </div>
                 ))}
@@ -323,7 +384,9 @@ const StudentDashboard = () => {
                     <path d="M12 5V3M12 21V19M5 12H3M21 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </div>
-                <div className="status-value">{dispensaryStatus.doctorsAvailable}/{dispensaryStatus.totalDoctors}</div>
+                <div className="status-value">
+                  {availableDoctors}/{totalDoctors}
+                </div>
                 <div className="status-label">Doctors Available</div>
               </div>
               <div className="status-item queue-status">
@@ -341,8 +404,8 @@ const StudentDashboard = () => {
             </div>
 
             <div className="dispensary-status-badge">
-              <span className={`status-dot ${dispensaryStatus.isOpen ? 'open' : 'closed'}`}></span>
-              {dispensaryStatus.isOpen ? 'Dispensary Open' : 'Dispensary Closed'}
+              <span className={`status-dot ${isDispensaryOpen ? 'open' : 'closed'}`}></span>
+              {isDispensaryOpen ? 'Dispensary Open' : 'Dispensary Closed'}
             </div>
           </div>
 
@@ -394,4 +457,4 @@ const StudentDashboard = () => {
   );
 };
 
-export default StudentDashboard;
+export default StudentDashboard;  
