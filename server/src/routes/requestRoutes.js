@@ -1,14 +1,10 @@
 import express from "express";
-import { verifyToken } from "../middlewares/verifyToken.js";
-import { createRequest } from "../controllers/requestController.js";
+import { createRequest, getDoctorRequests } from "../controllers/requestController.js";
+import verifyToken from "../middlewares/verifyToken.js";
 
 const router = express.Router();
 
-/**
- * Student submits a health request
- * Protected route (Firebase Auth)
- */
 router.post("/", verifyToken, createRequest);
+router.get("/doctor", verifyToken, getDoctorRequests);
 
 export default router;
-
