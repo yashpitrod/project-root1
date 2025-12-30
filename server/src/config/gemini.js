@@ -1,29 +1,25 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai"; // The new 2025 library
+import 'dotenv/config'; 
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-console.log("GEMINI KEY:", process.env.GEMINI_API_KEY);
+// Initialize the Client (no more new GoogleGenerativeAI)
+const client = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY
+});
 
-// 🔹 PURE TRANSLATION ONLY
 export const translateToEnglishGemini = async (text) => {
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+    // UPDATED: Using the exact string from your 'curl' result
+    const response = await client.models.generateContent({
+      model: "gemini-3-flash-preview", 
+      contents: [{
+        role: "user",
+        parts: [{ text: `Translate the following to English. Return ONLY the translation: ${text}` }]
+      }]
     });
 
-    const prompt = `
-Translate the following text into English.
-Return ONLY the translated English text.
-Do NOT summarize.
-Do NOT add explanations.
-
-Text:
-${text}
-    `;
-
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    return response.text.trim();
   } catch (error) {
-    console.error("Gemini Translate Error:", error);
+    console.error("Gemini Error:", error.status, error.message);
     throw new Error("Translation failed");
   }
 };
