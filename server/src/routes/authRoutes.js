@@ -4,79 +4,76 @@ import User from "../models/User.js";
 
 const router = express.Router();
 
-// 🔒 Prebuilt doctor email list
 const allowedDoctors = [
   "champak.bhattacharyya@gmail.com",
   "sameer.patnaik@gmail.com",
   "soumyaranjan.behera@gmail.com",
   "anirban.ghosh@gmail.com",
   "savitri.munda@gmail.com",
-  "kapil.meena@gmail.com"
+  "kapil.meena@gmail.com",
 ];
 
-/**
- * First login → store user
- * Next login → return stored user
- */
+// ---------------- REGISTER ----------------
 router.post("/register", verifyToken, async (req, res) => {
   try {
-    // 1. Check if user already exists
-    let user = await User.findOne({ uid: req.uid });
-    if (user) {
-      return res.json(user); // returning user
-    }
+    const { id, email } = req.user;
 
-    // 2. Determine role
-    const email = req.email.toLowerCase();
+    let user = await User.findOne({ uid: id });
+    if (user) return res.json(user);
+
     const isDoctor = allowedDoctors.includes(email);
-    let role;
-    if (isDoctor) {
-      role = "doctor";
-    } else {
-      // Only allow valid roles from frontend (no admin signup)
-      const allowedRoles = ["student", "staff"];
-      role = allowedRoles.includes(req.body.role) ? req.body.role : "student";
-    }
 
-    // 3. Create user
+    const allowedRoles = ["student", "staff"];
+    const role = isDoctor
+      ? "doctor"
+      : allowedRoles.includes(req.body.role)
+      ? req.body.role
+      : "student";
+
     user = await User.create({
-      uid: req.uid,
+      uid: id,
       email,
-      name: req.body.fullName || "User",
+      name: req.body.fullName || email.split("@")[0],
       role,
-      isApproved: isDoctor // doctors only if whitelisted
+      isApproved: isDoctor,
     });
 
     res.json(user);
-  } catch (error) {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Registration failed" });
   }
 });
 
-/**
- * Get logged-in user
- */
+// ---------------- ME ----------------
 router.get("/me", verifyToken, async (req, res) => {
-  let user = await User.findOne({ uid: req.uid }).select("-__v");
-  const email = req.email.toLowerCase();
-  const isDoctor = allowedDoctors.includes(email);
-  // If user exists but should be doctor, update role
-  if (user && isDoctor && user.role !== "doctor") {
-    user.role = "doctor";
-    user.isApproved = true;
-    await user.save();
+  try {
+    const { id, email } = req.user;
+    const isDoctor = allowedDoctors.includes(email);
+
+    let user = await User.findOne({ uid: id });
+
+    if (!user) {
+      user = await User.create({
+        uid: id,
+        email,
+        name: email.split("@")[0],
+        role: isDoctor ? "doctor" : "student",
+        isApproved: isDoctor,
+      });
+    }
+
+    if (isDoctor && user.role !== "doctor") {
+      user.role = "doctor";
+      user.isApproved = true;
+      await user.save();
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch user" });
   }
-  if (!user) {
-    // Auto-create user in MongoDB if not found, using Firebase token info
-    user = await User.create({
-      uid: req.uid,
-      email: req.email,
-      name: req.email.split("@")[0], // fallback to email prefix as name
-      role: isDoctor ? "doctor" : "student", // assign doctor if whitelisted
-      isApproved: isDoctor
-    });
-  }
-  res.json(user);
 });
 
 export default router;

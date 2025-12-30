@@ -32,16 +32,19 @@ const verifyToken = async (req, res, next) => {
     const token = authHeader.split(" ")[1];
     const decoded = await admin.auth().verifyIdToken(token);
 
-    // ✅ Attach user info
+    if (!decoded.email) {
+      return res.status(401).json({ message: "Token missing email" });
+    }
+
+    // ✅ SINGLE SOURCE OF TRUTH
     req.user = {
       id: decoded.uid,
-      email: decoded.email,
-      role: decoded.role || "student",
+      email: decoded.email.toLowerCase(),
     };
 
     next();
   } catch (error) {
-    console.error("Auth error:", error);
+    console.error("Auth error:", error.message);
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };

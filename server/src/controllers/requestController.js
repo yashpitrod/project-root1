@@ -12,14 +12,14 @@ export const createRequest = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Ensure English text is always saved
+    // Always save English text
     const finalEnglishText = alreadyTranslated
       ? problem
       : await translateToEnglish(problem);
 
     const request = await Request.create({
-      studentId: req.user.id,
-      doctorId,
+      studentId: req.user.uid,   // ✅ Firebase UID (string)
+      doctorId: doctorId,        // ✅ Firebase UID (string)
       problemEnglish: finalEnglishText,
       timeSlot,
     });
@@ -37,8 +37,8 @@ export const createRequest = async (req, res) => {
 export const getDoctorRequests = async (req, res) => {
   try {
     const requests = await Request.find({
-      doctorId: req.user.id,
-    }).populate("studentId", "name email");
+      doctorId: req.user.uid,   // ✅ Firebase UID
+    });
 
     res.status(200).json(requests);
   } catch (error) {
