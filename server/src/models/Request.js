@@ -3,14 +3,16 @@ import mongoose from "mongoose";
 const requestSchema = new mongoose.Schema(
   {
     studentId: {
-      type: String,   // ✅ Firebase UID
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",          // Student user
       required: true,
     },
     doctorId: {
-      type: String,   // ✅ Firebase UID
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",          // Doctor user
       required: true,
     },
-    problemEnglish: {
+    problem: {
       type: String,
       required: true,
     },
@@ -20,6 +22,7 @@ const requestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
+      enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
   },

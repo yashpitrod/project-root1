@@ -14,6 +14,7 @@ const socket = io("http://localhost:5000", {
   transports: ["websocket"],
 });
 
+
 const StudentDashboard = () => {
   const [problem, setProblem] = useState("");
   const [translatedText, setTranslatedText] = useState("");
@@ -24,11 +25,18 @@ const StudentDashboard = () => {
   const [doctors, setDoctors] = useState([]);
 
   const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId");
+
+  const user = JSON.parse(localStorage.getItem("user"));
+
 
   const healthRecord = {
     lastVisit: '15 Dec 2024',
     totalVisits: 7,
   };
+
+  const [recentRequest, setRecentRequest] = useState(null);
+
 
   const totalDoctors = doctors.length;
   const availableDoctors = doctors.filter(
@@ -39,12 +47,52 @@ const StudentDashboard = () => {
   const dispensaryStatus = {
     inQueue: 5,
   };
+  const filteredDoctors = doctors.filter(
+    (doc) => doc._id !== user?._id
+  );
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const savedRequest = localStorage.getItem("recentRequest");
+    if (savedRequest) {
+      setRecentRequest(JSON.parse(savedRequest));
+    }
+  }, []);
+  useEffect(() => {
+  const fetchLatestRequest = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/requests/my", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.requests.length > 0) {
+        const latest = data.requests[0]; // newest request
+
+        setRecentRequest(latest);
+        setAppointmentStatus(latest.status);
+
+        // ✅ sync localStorage
+        localStorage.setItem("recentRequest", JSON.stringify(latest));
+      }
+    } catch (err) {
+      console.error("Failed to fetch latest request:", err);
+    }
+  };
+
+  fetchLatestRequest();
+}, []);
+
+
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("recentRequest");
     navigate("/login");
   };
   useEffect(() => {
@@ -53,6 +101,13 @@ const StudentDashboard = () => {
       navigate("/login");
     }
   }, [navigate]);
+  useEffect(() => {
+  if (!userId) return;
+
+  socket.emit("join-room", userId);
+  console.log("🟢 Student joined socket room:", userId);
+}, [userId]);
+
   useEffect(() => {
     fetch("http://localhost:5000/api/doctors")
       .then(res => res.json())
@@ -74,6 +129,31 @@ const StudentDashboard = () => {
       socket.off("doctor-status-updated");
     };
   }, []);
+  useEffect(() => {
+  socket.on("request-status-updated", ({ requestId, status }) => {
+    console.log("📡 Student received status update:", requestId, status);
+
+    setRecentRequest(prev => {
+      if (!prev || prev._id !== requestId) return prev;
+
+      const updated = { ...prev, status };
+
+      // ✅ VERY IMPORTANT
+      localStorage.setItem("recentRequest", JSON.stringify(updated));
+
+      return updated;
+    });
+
+    // ✅ Top banner update
+    setAppointmentStatus(status);
+  });
+
+  return () => {
+    socket.off("request-status-updated");
+  };
+}, []);
+
+
 
   // Generate time slots with 10-minute intervals (9 AM to 6 PM, excluding 12-1 PM lunch and 3-4 PM break)
   const generateTimeSlots = () => {
@@ -135,9 +215,13 @@ const StudentDashboard = () => {
   };
 
   const handleSubmit = async () => {
+    if (selectedDoctor === user._id) {
+      alert("You cannot book appointment with yourself");
+      return;
+    }
+
     let textToSend = problem;
 
-    // Auto-translate if not translated yet
     if (!translated) {
       try {
         const res = await fetch("http://localhost:5000/api/translate", {
@@ -150,7 +234,6 @@ const StudentDashboard = () => {
         });
 
         const data = await res.json();
-
         if (data.success) {
           textToSend = data.translatedText;
           setTranslatedText(data.translatedText);
@@ -161,20 +244,35 @@ const StudentDashboard = () => {
       }
     }
 
-    await fetch("http://localhost:5000/api/requests", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        problem: textToSend,
-        alreadyTranslated: true,
-        doctorId: selectedDoctor,
-        timeSlot: selectedTimeSlot,
-      }),
-    });
+    const res = await fetch("http://localhost:5000/api/requests", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  },
+  body: JSON.stringify({
+    problem: textToSend,
+    alreadyTranslated: true,
+    doctorId: selectedDoctor,
+    timeSlot: selectedTimeSlot,
+  }),
+});
 
+const data = await res.json();
+
+
+    const newRequest = {
+  _id: data.request._id,   // 🔥 VERY IMPORTANT
+  problem: textToSend,
+  doctorId: selectedDoctor,
+  timeSlot: selectedTimeSlot,
+  status: "pending",
+  createdAt: new Date().toLocaleString(),
+};
+
+
+    setRecentRequest(newRequest);
+    localStorage.setItem("recentRequest", JSON.stringify(newRequest));
     setAppointmentStatus("pending");
   };
 
@@ -266,16 +364,21 @@ const StudentDashboard = () => {
             <div className="doctor-selection">
               <label>Select Doctor</label>
               <div className="doctors-grid">
-                {doctors.map((doctor) => (
+                {filteredDoctors.map((doctor) => (
+
                   <div
                     key={doctor._id}
-                    className={`doctor-card ${doctor.availability !== "available" ? "unavailable" : ""
-                      }`}
-                    onClick={() =>
-                      doctor.availability === "available" &&
-                      setSelectedDoctor(doctor._id)
-                    }
+                    className={`doctor-card 
+    ${doctor.availability !== "available" ? "unavailable" : ""}
+    ${selectedDoctor === doctor._id ? "selected" : ""}
+  `}
+                    onClick={() => {
+                      if (doctor.availability === "available") {
+                        setSelectedDoctor(doctor._id);
+                      }
+                    }}
                   >
+
                     <div className="doctor-image">
                       <img
                         src={
@@ -351,7 +454,7 @@ const StudentDashboard = () => {
                   <p>
                     {appointmentStatus === 'pending'
                       ? 'Waiting for doctor confirmation...'
-                      : `Your appointment with ${doctors.find(d => d.id === selectedDoctor)?.name} at ${selectedTimeSlot} is confirmed.`}
+                      : `Your appointment with ${doctors.find(d => d._id === selectedDoctor)?.name} at ${selectedTimeSlot} is confirmed.`}
                   </p>
                 </div>
               </div>
@@ -408,6 +511,25 @@ const StudentDashboard = () => {
               {isDispensaryOpen ? 'Dispensary Open' : 'Dispensary Closed'}
             </div>
           </div>
+          {recentRequest && (
+            <div className="card recent-request-card">
+              <div className="card-header">
+                <h2>Recent Request</h2>
+                <p>Latest health request</p>
+              </div>
+
+              <div className="recent-request-body">
+                <p><strong>Problem:</strong> {recentRequest.problem}</p>
+                <p>
+                  <strong>Doctor:</strong>{" "}
+                  {doctors.find(d => d._id === recentRequest.doctorId)?.name}
+                </p>
+                <p><strong>Time Slot:</strong> {recentRequest.timeSlot}</p>
+                <p><strong>Status:</strong> {recentRequest.status}</p>
+                <p className="request-time">{recentRequest.createdAt}</p>
+              </div>
+            </div>
+          )}
 
           {/* Health Records */}
           <div className="card health-records-card">

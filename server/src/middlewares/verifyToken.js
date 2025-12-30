@@ -2,6 +2,7 @@ import admin from "firebase-admin";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import User from "../models/User.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,17 +31,27 @@ const verifyToken = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
+
+    // 🔐 Verify Firebase token
     const decoded = await admin.auth().verifyIdToken(token);
 
     if (!decoded.email) {
       return res.status(401).json({ message: "Token missing email" });
     }
 
-    // ✅ SINGLE SOURCE OF TRUTH
-    req.user = {
-      id: decoded.uid,
+    // 🔥 FETCH MONGODB USER (SINGLE SOURCE OF TRUTH)
+    const mongoUser = await User.findOne({
       email: decoded.email.toLowerCase(),
-    };
+    });
+
+    if (!mongoUser) {
+      return res.status(401).json({
+        message: "User not found in database",
+      });
+    }
+
+    // ✅ ATTACH FULL MONGO USER
+    req.user = mongoUser;
 
     next();
   } catch (error) {

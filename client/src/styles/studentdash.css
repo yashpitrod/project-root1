@@ -702,3 +702,20 @@
 .logout-text-btn:hover {
   background: #dc2626;
 }
+.doctor-card.selected {
+  border: 2px solid #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+.recent-request-card {
+  margin-bottom: 20px;
+}
+
+.recent-request-body p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+.request-time {
+  font-size: 12px;
+  opacity: 0.6;
+}

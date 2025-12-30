@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import "../styles/DoctorDashboard.css";
+import { io } from "socket.io-client";
 
 const DoctorDashboard = () => {
+  const socketRef = useRef(null);
 
-  // ✅ 1. FIRST declare token
   const token = localStorage.getItem("token");
 
-  // ✅ 2. THEN states
   const [doctor, setDoctor] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -14,29 +14,21 @@ const DoctorDashboard = () => {
 
   const [settings, setSettings] = useState({
     notifications: true,
-    autoConfirm: false
+    autoConfirm: false,
   });
 
-    useEffect(() => {
-    if (!token) return;
+  /* INIT SOCKET */
+  useEffect(() => {
+    socketRef.current = io("http://localhost:5000", {
+      transports: ["websocket"],
+    });
 
-    fetch("http://localhost:5000/api/requests/doctor", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then(res => res.json())
-      .then(data => setAppointments(data))
-      .catch(err => console.error(err));
+    return () => {
+      socketRef.current.disconnect();
+    };
+  }, []);
 
-  }, [token]);
-
-  const updateStatus = (id, status) => {
-    setAppointments(prev =>
-      prev.map(a => (a.id === id ? { ...a, status } : a))
-    );
-  };
-
+  /* LOAD DOCTOR */
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -46,21 +38,82 @@ const DoctorDashboard = () => {
     }
   }, []);
 
+  /* JOIN ROOM */
+  useEffect(() => {
+    if (!doctor?._id) return;
 
-  const toggleSetting = (key) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+    socketRef.current.emit("join-room", doctor._id);
+    console.log("Doctor joined room:", doctor._id);
+  }, [doctor]);
 
-  const pendingCount = appointments.filter(a => a.status === "pending").length;
-  const approvedCount = appointments.filter(a => a.status === "approved").length;
+  /* RECEIVE NEW REQUEST */
+  useEffect(() => {
+  if (!socketRef.current) return;
 
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric"
+  socketRef.current.on("new-request", ({ request }) => {
+    setAppointments(prev => [request, ...prev]);
   });
 
+  return () => {
+    socketRef.current?.off("new-request");
+  };
+}, []);
+
+
+  /* FETCH APPOINTMENTS */
+  useEffect(() => {
+    if (!token) return;
+
+    fetch("http://localhost:5000/api/requests/doctor", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setAppointments(data.requests);
+        }
+      });
+  }, [token]);
+
+  /* UPDATE STATUS */
+  const updateStatus = async (id, status) => {
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/requests/${id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Server error:", text);
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.success) {
+      setAppointments(prev =>
+        prev.map(a =>
+          a._id === id ? { ...a, status: data.request.status } : a
+        )
+      );
+    }
+  } catch (err) {
+    console.error("Status update failed:", err);
+  }
+};
+
+
+  /* AVAILABILITY */
   const toggleAvailability = async () => {
     const newStatus = availability === "available" ? "busy" : "available";
 
@@ -77,7 +130,19 @@ const DoctorDashboard = () => {
     setAvailability(data.availability);
   };
 
+  const pendingCount = appointments.filter(a => a.status === "pending").length;
+  const approvedCount = appointments.filter(a => a.status === "approved").length;
+  const today = new Date().toLocaleDateString("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 
+
+  /* ========================
+     UI
+  ======================== */
   return (
     <div className="dashboard">
 
@@ -180,11 +245,11 @@ const DoctorDashboard = () => {
         {activeMenu === "appointments" && (
           <section className="page">
             {appointments.map(app => (
-              <div key={app.id} className="appointment-card">
+              <div key={app._id} className="appointment-card">
                 <div>
-                  <h4>{app.name}</h4>
-                  <p>{app.issue}</p>
-                  <small>{app.time}</small>
+                  <h4>{app.studentId?.name}</h4>
+                  <p>{app.problem}</p>
+                  <small>{app.timeSlot}</small>
                 </div>
 
                 <div className="actions">
@@ -192,13 +257,13 @@ const DoctorDashboard = () => {
                     <>
                       <button
                         className="btn approve"
-                        onClick={() => updateStatus(app.id, "approved")}
+                        onClick={() => updateStatus(app._id, "approved")}
                       >
                         Approve
                       </button>
                       <button
                         className="btn reject"
-                        onClick={() => updateStatus(app.id, "rejected")}
+                        onClick={() => updateStatus(app._id, "rejected")}
                       >
                         Reject
                       </button>

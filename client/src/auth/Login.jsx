@@ -51,6 +51,8 @@ const Login = () => {
 
       /* ✅ STORE USER FOR PROFILE PAGE */
       localStorage.setItem("user", JSON.stringify(data));
+      localStorage.setItem("userId", data._id);
+
       // 3️⃣ Role-based redirect (backend decides)
       if (data.role === "doctor") navigate("/doctor");
       else if (data.role === "staff") navigate("/staff");
