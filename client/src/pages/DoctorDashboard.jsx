@@ -1,10 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import "../styles/DoctorDashboard.css";
 import { io } from "socket.io-client";
+import { signOut } from "firebase/auth";
+import { auth } from "../auth/firebase";
+import { useNavigate } from "react-router-dom";
 
 const DoctorDashboard = () => {
   const socketRef = useRef(null);
-
+  const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
   const [doctor, setDoctor] = useState(null);
@@ -16,6 +19,16 @@ const DoctorDashboard = () => {
     notifications: true,
     autoConfirm: false,
   });
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.clear();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   /* INIT SOCKET */
   useEffect(() => {
@@ -48,16 +61,16 @@ const DoctorDashboard = () => {
 
   /* RECEIVE NEW REQUEST */
   useEffect(() => {
-  if (!socketRef.current) return;
+    if (!socketRef.current) return;
 
-  socketRef.current.on("new-request", ({ request }) => {
-    setAppointments(prev => [request, ...prev]);
-  });
+    socketRef.current.on("new-request", ({ request }) => {
+      setAppointments(prev => [request, ...prev]);
+    });
 
-  return () => {
-    socketRef.current?.off("new-request");
-  };
-}, []);
+    return () => {
+      socketRef.current?.off("new-request");
+    };
+  }, []);
 
 
   /* FETCH APPOINTMENTS */
@@ -79,39 +92,66 @@ const DoctorDashboard = () => {
 
   /* UPDATE STATUS */
   const updateStatus = async (id, status) => {
-  try {
-    const res = await fetch(
-      `http://localhost:5000/api/requests/${id}/status`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
-      }
-    );
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("Server error:", text);
-      return;
-    }
-
-    const data = await res.json();
-
-    if (data.success) {
-      setAppointments(prev =>
-        prev.map(a =>
-          a._id === id ? { ...a, status: data.request.status } : a
-        )
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/requests/${id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        }
       );
-    }
-  } catch (err) {
-    console.error("Status update failed:", err);
-  }
-};
 
+      const deleteAppointment = async (id) => {
+        const confirmDelete = window.confirm(
+          "Are you sure you want to delete this appointment?"
+        );
+
+        if (!confirmDelete) return;
+
+        try {
+          const res = await fetch(
+            `http://localhost:5000/api/requests/${id}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          const data = await res.json();
+
+          if (data.success) {
+            setAppointments(prev => prev.filter(app => app._id !== id));
+          }
+        } catch (error) {
+          console.error("Delete failed:", error);
+        }
+      };
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Server error:", text);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data.success) {
+        setAppointments(prev =>
+          prev.map(a =>
+            a._id === id ? { ...a, status: data.request.status } : a
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Status update failed:", err);
+    }
+  };
 
   /* AVAILABILITY */
   const toggleAvailability = async () => {
@@ -133,12 +173,37 @@ const DoctorDashboard = () => {
   const pendingCount = appointments.filter(a => a.status === "pending").length;
   const approvedCount = appointments.filter(a => a.status === "approved").length;
   const today = new Date().toLocaleDateString("en-US", {
-  weekday: "long",
-  month: "long",
-  day: "numeric",
-  year: "numeric",
-});
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
+  const useCounter = (value, duration = 800) => {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+      let start = 0;
+      const increment = value / (duration / 16);
+
+      const timer = setInterval(() => {
+        start += increment;
+        if (start >= value) {
+          setCount(value);
+          clearInterval(timer);
+        } else {
+          setCount(Math.ceil(start));
+        }
+      }, 16);
+
+      return () => clearInterval(timer);
+    }, [value]);
+
+    return count;
+  };
+  const animatedTotal = useCounter(appointments.length);
+  const animatedPending = useCounter(pendingCount);
+  const animatedApproved = useCounter(approvedCount);
 
   /* ========================
      UI
@@ -200,12 +265,16 @@ const DoctorDashboard = () => {
           </button>
         </nav>
 
+        <div
+          className={`status-badge ${availability === "available" ? "online" : "offline"}`}
+          onClick={toggleAvailability}
+          style={{ margin: "10px", cursor: "pointer", fontWeight: "bold", textAlign: "center" }}
+        >
+          ● {availability === "available" ? "Go Offline" : "Go Online"}
+        </div>
         <div className="sidebar-footer">
-          <button
-            className={`availability-toggle ${availability === "available" ? "on" : "off"}`}
-            onClick={toggleAvailability}
-          >
-            ● {availability === "available" ? "Go Offline" : "Go Online"}
+          <button className="logout-btn" onClick={handleLogout}>
+            ⏻ Logout
           </button>
         </div>
       </aside>
@@ -218,41 +287,45 @@ const DoctorDashboard = () => {
             <h1>Welcome, Doctor</h1>
             <p className="date">{today}</p>
           </div>
-
-          <div className="stats">
-            <div>
-              <strong>{appointments.length}</strong>
-              <span>Appointments</span>
-            </div>
-            <div>
-              <strong>{pendingCount}</strong>
-              <span>Pending</span>
-            </div>
-            <div>
-              <strong>{approvedCount}</strong>
-              <span>Approved</span>
-            </div>
-          </div>
         </header>
 
         {activeMenu === "dashboard" && (
-          <section className="page">
-            <h2>Good day 👨‍⚕️</h2>
-            <p>You have {pendingCount} pending appointments today.</p>
+          <section className="page dashboard-home">
+            <div className="welcome-box">
+              <h2>Good day 👨‍⚕️</h2>
+              <p>You have {pendingCount} pending appointments today.</p>
+            </div>
+
+            <div className="stats-cards">
+              <div className="stat-card">
+                <h3>{animatedTotal}</h3>
+                <p>Total Appointments</p>
+              </div>
+
+              <div className="stat-card">
+                <h3>{animatedPending}</h3>
+                <p>Pending</p>
+              </div>
+
+              <div className="stat-card">
+                <h3>{animatedApproved}</h3>
+                <p>Approved</p>
+              </div>
+            </div>
           </section>
         )}
 
         {activeMenu === "appointments" && (
           <section className="page">
             {appointments.map(app => (
-              <div key={app._id} className="appointment-card">
-                <div>
+              <div key={app._id} className="appointment-card modern">
+                <div className="appointment-main">
                   <h4>{app.studentId?.name}</h4>
-                  <p>{app.problem}</p>
-                  <small>{app.timeSlot}</small>
+                  <p className="problem">problem : {app.problem}</p>
+                  <span className="time">{app.timeSlot}</span>
                 </div>
 
-                <div className="actions">
+                <div className="appointment-actions">
                   {app.status === "pending" ? (
                     <>
                       <button
@@ -269,10 +342,18 @@ const DoctorDashboard = () => {
                       </button>
                     </>
                   ) : (
-                    <span className={`tag ${app.status}`}>
+                    <span className={`status-pill ${app.status}`}>
                       {app.status}
                     </span>
                   )}
+
+                  <span
+                    className="delete-icon"
+                    onClick={() => deleteAppointment(app._id)}
+                    title="Delete appointment"
+                  >
+                    🗑️
+                  </span>
                 </div>
               </div>
             ))}

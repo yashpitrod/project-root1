@@ -4,6 +4,7 @@ import Register from '../auth/Register';
 import StudentDashboard from '../pages/StudentDashboard';
 import DoctorDashboard from '../pages/DoctorDashboard';
 import StudentProfile from '../pages/StudentProfile';
+import RequestHistory from "../pages/RequestHistory";
 
 const AppRouter = () => {
 
@@ -16,6 +17,7 @@ const AppRouter = () => {
         <Route path="/student" element={<StudentDashboard />} />
         <Route path="/doctor" element={<DoctorDashboard />} />
         <Route path="/student/profile" element={<StudentProfile />} />
+        <Route path="/student/history" element={<RequestHistory />} />
       </Routes>
     </BrowserRouter>
   );

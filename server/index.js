@@ -24,11 +24,9 @@ const io = new Server(server, {
 
 /* 🔗 SOCKET CONNECTION */
 io.on("connection", (socket) => {
-  console.log("🔌 Socket connected:", socket.id);
 
   socket.on("join-room", (userId) => {
     socket.join(userId);
-    console.log("👤 Joined room:", userId);
   });
 });
 

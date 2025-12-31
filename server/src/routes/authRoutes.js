@@ -16,14 +16,14 @@ const allowedDoctors = [
 // ---------------- REGISTER ----------------
 router.post("/register", verifyToken, async (req, res) => {
   try {
-    const { id, email } = req.user;
+    const { uid, email, name } = req.firebaseUser;
 
-    let user = await User.findOne({ uid: id });
+    let user = await User.findOne({ uid });
     if (user) return res.json(user);
 
     const isDoctor = allowedDoctors.includes(email);
 
-    const allowedRoles = ["student", "staff"];
+    const allowedRoles = ["student", "staff", "admin"];
     const role = isDoctor
       ? "doctor"
       : allowedRoles.includes(req.body.role)
@@ -31,14 +31,14 @@ router.post("/register", verifyToken, async (req, res) => {
       : "student";
 
     user = await User.create({
-      uid: id,
+      uid,
       email,
-      name: req.body.fullName || email.split("@")[0],
+      name: req.body.fullName || name,
       role,
       isApproved: isDoctor,
     });
 
-    res.json(user);
+    res.status(201).json(user);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Registration failed" });
@@ -48,21 +48,18 @@ router.post("/register", verifyToken, async (req, res) => {
 // ---------------- ME ----------------
 router.get("/me", verifyToken, async (req, res) => {
   try {
-    const { id, email } = req.user;
+    const { uid, email, name } = req.firebaseUser;
     const isDoctor = allowedDoctors.includes(email);
 
-    let user = await User.findOne({ uid: id });
+    let user = await User.findOne({ uid });
 
     if (!user) {
-      user = await User.create({
-        uid: id,
-        email,
-        name: email.split("@")[0],
-        role: isDoctor ? "doctor" : "student",
-        isApproved: isDoctor,
+      return res.status(404).json({
+        message: "User not registered. Please register first.",
       });
     }
 
+    // Doctor auto-upgrade safety
     if (isDoctor && user.role !== "doctor") {
       user.role = "doctor";
       user.isApproved = true;
@@ -75,5 +72,6 @@ router.get("/me", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user" });
   }
 });
+
 
 export default router;

@@ -4,9 +4,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import User from "../models/User.js";
 
+/* ---------------- PATH SETUP ---------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/* ---------------- FIREBASE INIT ---------------- */
 const serviceAccountPath = path.join(
   __dirname,
   "../config/firebaseServiceAccount.json"
@@ -22,6 +24,7 @@ if (!admin.apps.length) {
   });
 }
 
+/* ---------------- VERIFY TOKEN ---------------- */
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -32,25 +35,30 @@ const verifyToken = async (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
 
-    // 🔐 Verify Firebase token
+    // 🔐 Verify Firebase ID token
     const decoded = await admin.auth().verifyIdToken(token);
 
     if (!decoded.email) {
       return res.status(401).json({ message: "Token missing email" });
     }
 
-    // 🔥 FETCH MONGODB USER (SINGLE SOURCE OF TRUTH)
-    const mongoUser = await User.findOne({
+    /* 🔥 Firebase identity (always available) */
+    req.firebaseUser = {
+      uid: decoded.uid,
       email: decoded.email.toLowerCase(),
-    });
+      name: decoded.name || decoded.email.split("@")[0],
+    };
+
+    /* 🔥 MongoDB user (required for protected routes) */
+    const mongoUser = await User.findOne({ uid: decoded.uid });
 
     if (!mongoUser) {
       return res.status(401).json({
-        message: "User not found in database",
+        message: "User not registered in database",
       });
     }
 
-    // ✅ ATTACH FULL MONGO USER
+    /* ✅ Attach Mongo user (THIS FIXES req.user._id) */
     req.user = mongoUser;
 
     next();
