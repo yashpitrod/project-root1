@@ -22,21 +22,14 @@ const StudentDashboard = () => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [appointmentStatus, setAppointmentStatus] = useState(null);
+  const [lastVisitDate, setLastVisitDate] = useState(null);
   const [doctors, setDoctors] = useState([]);
 
   const token = localStorage.getItem("token");
   const userId = localStorage.getItem("userId");
 
   const user = JSON.parse(localStorage.getItem("user"));
-
-
-  const healthRecord = {
-    lastVisit: '15 Dec 2024',
-    totalVisits: 7,
-  };
-
   const [recentRequest, setRecentRequest] = useState(null);
-
 
   const totalDoctors = doctors.length;
   const availableDoctors = doctors.filter(
@@ -59,35 +52,46 @@ const StudentDashboard = () => {
       setRecentRequest(JSON.parse(savedRequest));
     }
   }, []);
+
   useEffect(() => {
-  const fetchLatestRequest = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/requests/my", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const fetchLatestRequest = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/requests/my", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (data.success && data.requests.length > 0) {
-        const latest = data.requests[0]; // newest request
+        if (data.success && data.requests.length > 0) {
+          const latest = data.requests[0];
 
-        setRecentRequest(latest);
-        setAppointmentStatus(latest.status);
+          // ✅ enrich request with doctor name
+          const enriched = {
+            ...latest,
+            doctorName: latest.doctorId?.name || "Doctor",
+          };
 
-        // ✅ sync localStorage
-        localStorage.setItem("recentRequest", JSON.stringify(latest));
+          setRecentRequest(enriched);
+          setAppointmentStatus(enriched.status);
+          localStorage.setItem("recentRequest", JSON.stringify(enriched));
+
+          // ✅ compute last approved visit
+          const approved = data.requests.find(
+            (r) => r.status === "approved"
+          );
+          if (approved) {
+            setLastVisitDate(new Date(approved.createdAt));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch latest request:", err);
       }
-    } catch (err) {
-      console.error("Failed to fetch latest request:", err);
-    }
-  };
+    };
 
-  fetchLatestRequest();
-}, []);
-
-
+    fetchLatestRequest();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -102,11 +106,11 @@ const StudentDashboard = () => {
     }
   }, [navigate]);
   useEffect(() => {
-  if (!userId) return;
+    if (!userId) return;
 
-  socket.emit("join-room", userId);
-  console.log("🟢 Student joined socket room:", userId);
-}, [userId]);
+    socket.emit("join-room", userId);
+    console.log("🟢 Student joined socket room:", userId);
+  }, [userId]);
 
   useEffect(() => {
     fetch("http://localhost:5000/api/doctors")
@@ -130,28 +134,28 @@ const StudentDashboard = () => {
     };
   }, []);
   useEffect(() => {
-  socket.on("request-status-updated", ({ requestId, status }) => {
-    console.log("📡 Student received status update:", requestId, status);
+    socket.on("request-status-updated", ({ requestId, status }) => {
+      console.log("📡 Student received status update:", requestId, status);
 
-    setRecentRequest(prev => {
-      if (!prev || prev._id !== requestId) return prev;
+      setRecentRequest(prev => {
+        if (!prev || prev._id !== requestId) return prev;
 
-      const updated = { ...prev, status };
+        const updated = { ...prev, status };
 
-      // ✅ VERY IMPORTANT
-      localStorage.setItem("recentRequest", JSON.stringify(updated));
+        // ✅ VERY IMPORTANT
+        localStorage.setItem("recentRequest", JSON.stringify(updated));
 
-      return updated;
+        return updated;
+      });
+
+      // ✅ Top banner update
+      setAppointmentStatus(status);
     });
 
-    // ✅ Top banner update
-    setAppointmentStatus(status);
-  });
-
-  return () => {
-    socket.off("request-status-updated");
-  };
-}, []);
+    return () => {
+      socket.off("request-status-updated");
+    };
+  }, []);
 
 
 
@@ -245,35 +249,55 @@ const StudentDashboard = () => {
     }
 
     const res = await fetch("http://localhost:5000/api/requests", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  },
-  body: JSON.stringify({
-    problem: textToSend,
-    alreadyTranslated: true,
-    doctorId: selectedDoctor,
-    timeSlot: selectedTimeSlot,
-  }),
-});
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        problem: textToSend,
+        alreadyTranslated: true,
+        doctorId: selectedDoctor,
+        timeSlot: selectedTimeSlot,
+      }),
+    });
 
-const data = await res.json();
-
+    const data = await res.json();
+    const doctorObj = doctors.find(d => d._id === selectedDoctor);
 
     const newRequest = {
-  _id: data.request._id,   // 🔥 VERY IMPORTANT
-  problem: textToSend,
-  doctorId: selectedDoctor,
-  timeSlot: selectedTimeSlot,
-  status: "pending",
-  createdAt: new Date().toLocaleString(),
-};
-
+      _id: data.request._id,
+      problem: textToSend,
+      doctorId: selectedDoctor,
+      doctorName: doctorObj?.name || "Doctor",
+      timeSlot: selectedTimeSlot,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
 
     setRecentRequest(newRequest);
     localStorage.setItem("recentRequest", JSON.stringify(newRequest));
     setAppointmentStatus("pending");
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatDateTime = (date) => {
+    if (!date) return "";
+    return new Date(date).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -519,25 +543,45 @@ const data = await res.json();
               </div>
 
               <div className="recent-request-body">
-                <p><strong>Problem:</strong> {recentRequest.problem}</p>
-                <p>
-                  <strong>Doctor:</strong>{" "}
-                  {doctors.find(d => d._id === recentRequest.doctorId)?.name}
-                </p>
-                <p><strong>Time Slot:</strong> {recentRequest.timeSlot}</p>
-                <p><strong>Status:</strong> {recentRequest.status}</p>
-                <p className="request-time">{recentRequest.createdAt}</p>
+                <div className="request-row">
+                  <span className="label">Problem</span>
+                  <span className="value">{recentRequest.problem}</span>
+                </div>
+
+                <div className="request-row">
+                  <span className="label">Doctor</span>
+                  <span className="value">
+                    {recentRequest.doctorName || "—"}
+                  </span>
+                </div>
+
+                <div className="request-row">
+                  <span className="label">Time Slot</span>
+                  <span className="time-pill">{recentRequest.timeSlot}</span>
+                </div>
+
+                <div className="request-footer">
+                  <span className={`status-badge ${recentRequest.status}`}>
+                    {recentRequest.status}
+                  </span>
+                  <span className="request-time">
+                    {formatDateTime(recentRequest.createdAt)}
+                  </span>
+                </div>
               </div>
             </div>
           )}
-
+          <button
+            className="view-history-btn"
+            onClick={() => navigate("/student/history")}
+          >
+            📜 View Request History
+          </button>
           {/* Health Records */}
           <div className="card health-records-card">
             <div className="card-header">
-              <div className="card-icon heart-icon">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.57831 8.50903 2.99871 7.05 2.99871C5.59096 2.99871 4.19169 3.57831 3.16 4.61C2.1283 5.64169 1.54871 7.04097 1.54871 8.5C1.54871 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6054C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.0621 22.0329 6.39464C21.7563 5.72718 21.351 5.12075 20.84 4.61Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+              <div className="card-icon health-icon">
+                <span>💚</span>
               </div>
               <div>
                 <h2>Health Records</h2>
@@ -547,28 +591,14 @@ const data = await res.json();
 
             <div className="records-list">
               <div className="record-item">
-                <div className="record-icon">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
-                    <path d="M16 2V6M8 2V6M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
+                <div className="record-icon calendar-icon">
+                  📅
                 </div>
                 <div className="record-info">
                   <span className="record-label">Last Visit Date</span>
-                  <span className="record-value">{healthRecord.lastVisit}</span>
-                </div>
-              </div>
-              <div className="record-item">
-                <div className="record-icon">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" strokeWidth="2" />
-                    <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="2" />
-                    <path d="M9 12H15M9 16H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div className="record-info">
-                  <span className="record-label">Total Visits</span>
-                  <span className="record-value">{healthRecord.totalVisits} visits</span>
+                  <span className="record-value">
+                    {lastVisitDate ? formatDate(lastVisitDate) : "No visits yet"}
+                  </span>
                 </div>
               </div>
             </div>

@@ -31,9 +31,9 @@ export const createRequest = async (req, res) => {
       status: "pending",
     });
     const io = req.app.get("io");
-io.to(doctorId.toString()).emit("new-request", {
-  request,
-});
+    io.to(doctorId.toString()).emit("new-request", {
+      request,
+    });
     res.status(201).json({
       success: true,
       request,
@@ -150,6 +150,45 @@ export const updateRequestStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to update request status",
+    });
+  }
+};
+
+/* ==================================
+   DOCTOR: Delete appointment
+================================== */
+export const deleteRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+
+    const request = await Request.findById(requestId);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Request not found",
+      });
+    }
+
+    // 🔒 Doctor can delete only their own appointment
+    if (request.doctorId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    await request.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Appointment deleted",
+    });
+  } catch (error) {
+    console.error("Delete Request Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete appointment",
     });
   }
 };
