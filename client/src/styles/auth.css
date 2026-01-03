@@ -230,3 +230,303 @@ body {
     font-size: 22px;
   }
 }
+/* ===============================
+   AUTH NAVBAR
+   =============================== */
+
+.auth-navbar {
+  height: 64px;
+  width: 100%;
+  background: #ffffff;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.auth-navbar-logo {
+  font-family: "Outfit", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gray-900);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 5em;
+}
+
+.auth-navbar-logo span {
+  color: var(--primary);
+}
+
+.auth-navbar-right {
+  display: flex;
+  gap: 18px;
+}
+
+/* ===============================
+   AUTH PAGE LAYOUT
+   =============================== */
+
+.auth-container {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  background: linear-gradient(
+    135deg,
+    #f9fafb 0%,
+    #ffffff 50%,
+    rgba(34, 197, 94, 0.05) 100%
+  );
+}
+
+.auth-layout {
+  display: flex;
+  width: 100%;
+  max-width: 1400px;
+}
+
+/* ===============================
+   LEFT BIG DIV
+   =============================== */
+
+.auth-left {
+  flex: 1;
+  /* background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.12),
+    rgba(34, 197, 94, 0.02)
+  ); */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===============================
+   RIGHT AUTH SECTION
+   =============================== */
+
+.auth-right {
+  width: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+/* ===============================
+   AUTH CARD (SAME FOR LOGIN & REGISTER)
+   =============================== */
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--white);
+  padding: 40px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 1;
+}
+
+/* REMOVE REGISTER SIZE DIFFERENCE */
+.auth-card.register-card {
+  max-width: 420px;
+}
+
+/* ===============================
+   MOBILE RESPONSIVE
+   =============================== */
+
+@media (max-width: 900px) {
+  .auth-left {
+    display: none;
+  }
+
+  .auth-right {
+    width: 100%;
+    padding: 24px;
+  }
+
+  .auth-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-navbar {
+    padding: 0 16px;
+  }
+
+  .auth-card {
+    padding: 28px 22px;
+  }
+}
+/* ===============================
+   LEFT SIDE IMAGE & CONTENT
+   =============================== */
+
+.auth-left {
+  position: relative;
+  /* overflow: hidden;
+  padding: 60px; */
+}
+
+.auth-left-image {
+  position: absolute;
+  inset: 0;
+  left: 18%;
+  top: -19%;
+  width: 70%;
+  height: 70%;
+  object-fit: cover;
+  opacity: 1;
+}
+
+/* ===============================
+   SEAMLESS RIBBONS (NO START / END)
+   =============================== */
+
+.ribbon {
+  position: absolute;
+  width: 160%;
+  left: -30%;
+  overflow: hidden;
+  padding: 14px 0;
+  font-size: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.ribbon-track {
+  display: flex;
+  width: max-content;
+}
+
+/* COMMON TEXT */
+.ribbon span {
+  white-space: nowrap;
+  padding-right: 40px;
+}
+
+/* GREEN RIBBON */
+.ribbon-green {
+  top: 44%;
+  background: linear-gradient(
+    135deg,
+    var(--primary),
+    var(--primary-dark)
+  );
+  color: #ffffff;
+  transform: rotate(-4deg);
+}
+
+.ribbon-green .ribbon-track {
+  animation: marquee-left 15s linear infinite;
+}
+
+/* WHITE RIBBON */
+.ribbon-white {
+  top: 44%;
+  background: #ffffff;
+  color: var(--primary);
+  transform: rotate(4deg);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.ribbon-white .ribbon-track {
+  animation: marquee-right 15s linear infinite;
+}
+
+/* ===============================
+   KEYFRAMES (NO RESET FEEL)
+   =============================== */
+
+@keyframes marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+/* ===============================
+   LEFT SIDE TEXT CONTENT
+   =============================== */
+
+.auth-left-content {
+  position: relative;
+  bottom: -130px;
+  z-index: 3;               /* image & ribbons ke upar */
+  max-width: 50vw;
+  padding: 32px;
+}
+
+.auth-left-content h1 {
+  font-family: "Outfit", sans-serif;
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 18px;
+  color: var(--gray-900);
+}
+
+.auth-left-content h1::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 4px;
+  margin-top: 12px;
+  border-radius: 2px;
+  background: linear-gradient(
+    135deg,
+    var(--primary),
+    var(--primary-dark)
+  );
+}
+
+.auth-left-content p {
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.7;
+  color: var(--gray-700);
+  margin-top: 18px;
+  max-width: 420px;
+}
+
+/* ===============================
+   SUBTLE ENTRANCE ANIMATION
+   =============================== */
+
+.auth-left-content {
+  animation: fadeSlideIn 1.1s ease forwards;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
