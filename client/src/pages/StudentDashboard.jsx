@@ -1,3 +1,8 @@
+// working : 
+//     >Submit appointment request with problem description, selected doctor, and time slot.
+//     >Receive real-time updates on request status via WebSocket.
+//     >View recent requests and health records.
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -16,6 +21,7 @@ const socket = io("http://localhost:5000", {
 
 
 const StudentDashboard = () => {
+  // Required State Variables
   const [problem, setProblem] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [translated, setTranslated] = useState(false);
@@ -24,28 +30,88 @@ const StudentDashboard = () => {
   const [appointmentStatus, setAppointmentStatus] = useState(null);
   const [lastVisitDate, setLastVisitDate] = useState(null);
   const [doctors, setDoctors] = useState([]);
-
-  const token = localStorage.getItem("token");
-  const userId = localStorage.getItem("userId");
-
-  const user = JSON.parse(localStorage.getItem("user"));
   const [recentRequest, setRecentRequest] = useState(null);
 
+  // Navigation hook
+  const navigate = useNavigate();
+
+  // Get user info from localStorage
+  const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId");
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  // 
   const totalDoctors = doctors.length;
   const availableDoctors = doctors.filter(
     (doc) => doc.availability === "available"
   ).length;
   const isDispensaryOpen = availableDoctors > 0;
-
-  const dispensaryStatus = {
-    inQueue: 5,
-  };
   const filteredDoctors = doctors.filter(
     (doc) => doc._id !== user?._id
   );
 
-  const navigate = useNavigate();
+  // Helper object for dispensary status
+  const dispensaryStatus = {
+    inQueue: 5,
+  };
 
+  //Helper functions for fetching date and time
+  const formatDate = (date) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatDateTime = (date) => {
+    if (!date) return "";
+    return new Date(date).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Generate time slots with 10-minute intervals (9 AM to 6 PM, excluding 12-1 PM lunch and 3-4 PM break)
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = 9; hour < 18; hour++) {
+      // Skip lunch time (12-1 PM) and break time (3-4 PM)
+      if (hour === 12 || hour === 15) continue;
+
+      for (let min = 0; min < 60; min += 30) {
+        const startHour = hour;
+        const startMin = min;
+        const endMin = min + 30;
+        const endHour = endMin >= 60 ? hour + 1 : hour;
+        const actualEndMin = endMin >= 60 ? 0 : endMin;
+
+        // Skip if end time falls into break periods
+        if ((endHour === 12) || (endHour === 15 && actualEndMin === 0)) continue;
+
+        const formatTime = (h, m) => {
+          const period = h >= 12 ? 'PM' : 'AM';
+          const displayHour = h > 12 ? h - 12 : h === 0 ? 12 : h;
+          return `${displayHour}:${m.toString().padStart(2, '0')} ${period}`;
+        };
+
+        const slotLabel = `${formatTime(startHour, startMin)} - ${formatTime(endHour, actualEndMin)}`;
+        slots.push(slotLabel);
+      }
+    }
+    return slots;
+  };
+  // Generate time slots
+  const timeSlots = generateTimeSlots();
+
+  //useeffet for => fetching requests
+  //                computing last visit
+  //                syncing localStorage
+  //1. for fetching recent request from localStorage
   useEffect(() => {
     const savedRequest = localStorage.getItem("recentRequest");
     if (savedRequest) {
@@ -53,6 +119,7 @@ const StudentDashboard = () => {
     }
   }, []);
 
+  //2. for fetching latest request from server
   useEffect(() => {
     const fetchLatestRequest = async () => {
       try {
@@ -93,12 +160,7 @@ const StudentDashboard = () => {
     fetchLatestRequest();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("recentRequest");
-    navigate("/login");
-  };
+  //3. for auth check and joining socket room
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -112,6 +174,7 @@ const StudentDashboard = () => {
     console.log("🟢 Student joined socket room:", userId);
   }, [userId]);
 
+  //4. for fetching doctors list
   useEffect(() => {
     fetch("http://localhost:5000/api/doctors")
       .then(res => res.json())
@@ -119,6 +182,7 @@ const StudentDashboard = () => {
       .catch(err => console.error("Failed to load doctors", err));
   }, []);
 
+  //5. for listening to socket events
   useEffect(() => {
     socket.on("doctor-status-updated", ({ doctorId, availability }) => {
       setDoctors((prevDoctors) =>
@@ -133,6 +197,8 @@ const StudentDashboard = () => {
       socket.off("doctor-status-updated");
     };
   }, []);
+
+  //6. for listening to request status updates
   useEffect(() => {
     socket.on("request-status-updated", ({ requestId, status }) => {
       console.log("📡 Student received status update:", requestId, status);
@@ -157,39 +223,13 @@ const StudentDashboard = () => {
     };
   }, []);
 
-
-
-  // Generate time slots with 10-minute intervals (9 AM to 6 PM, excluding 12-1 PM lunch and 3-4 PM break)
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = 9; hour < 18; hour++) {
-      // Skip lunch time (12-1 PM) and break time (3-4 PM)
-      if (hour === 12 || hour === 15) continue;
-
-      for (let min = 0; min < 60; min += 30) {
-        const startHour = hour;
-        const startMin = min;
-        const endMin = min + 30;
-        const endHour = endMin >= 60 ? hour + 1 : hour;
-        const actualEndMin = endMin >= 60 ? 0 : endMin;
-
-        // Skip if end time falls into break periods
-        if ((endHour === 12) || (endHour === 15 && actualEndMin === 0)) continue;
-
-        const formatTime = (h, m) => {
-          const period = h >= 12 ? 'PM' : 'AM';
-          const displayHour = h > 12 ? h - 12 : h === 0 ? 12 : h;
-          return `${displayHour}:${m.toString().padStart(2, '0')} ${period}`;
-        };
-
-        const slotLabel = `${formatTime(startHour, startMin)} - ${formatTime(endHour, actualEndMin)}`;
-        slots.push(slotLabel);
-      }
-    }
-    return slots;
+  // -------------------- EVENT HANDLERS --------------------
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("recentRequest");
+    navigate("/login");
   };
-
-  const timeSlots = generateTimeSlots();
 
   const handleTranslate = async () => {
     if (!problem.trim() || translated) return;
@@ -280,26 +320,8 @@ const StudentDashboard = () => {
     setAppointmentStatus("pending");
   };
 
-  const formatDate = (date) => {
-    if (!date) return "—";
-    return new Date(date).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
-  const formatDateTime = (date) => {
-    if (!date) return "";
-    return new Date(date).toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
+  // -------------------- UI --------------------
   return (
     <div className="dashboard-container">
       {/* Header */}
