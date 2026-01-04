@@ -1,0 +1,72 @@
+    .appointment-card-modern {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.05);
+        margin-bottom: 16px;
+    }
+
+    .appointment-card-modern .left {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+    }
+
+    .appointment-card-modern img {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+    }
+
+    .appointment-card-modern h4 {
+        margin: 0;
+        font-size: 15px;
+    }
+
+    .appointment-card-modern p {
+        font-size: 13px;
+        color: #777;
+    }
+
+    .appointment-card-modern span {
+        font-size: 12px;
+        color: #2e7d32;
+    }
+
+    /* BUTTONS  */
+    button.approve {
+        background: #2e7d32;
+        color: #fff;
+        border-radius: 10px;
+        padding: 8px 14px;
+    }
+
+    button.reject {
+        background: transparent;
+        border: 1px solid #e53935;
+        color: #e53935;
+        border-radius: 10px;
+        padding: 8px 14px;
+    }
+
+    /* //Subtle effects  */
+    .appointment-card-modern {
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .appointment-card-modern:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Buttons hover effect */
+    button.approve:hover {
+        background: #1b5e20;
+    }
+
+    button.reject:hover {
+        background: #ffebee;
+    }

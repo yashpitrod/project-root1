@@ -4,6 +4,9 @@ import { io } from "socket.io-client";
 import { signOut } from "firebase/auth";
 import { auth } from "../auth/firebase";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import DashboardStats from "../components/DashboardStats";
+import AppointmentCard from "../components/AppointmentCard";
 
 const DoctorDashboard = () => {
   const socketRef = useRef(null);
@@ -210,82 +213,23 @@ const DoctorDashboard = () => {
   ======================== */
   return (
     <div className="dashboard">
-
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <div className="logo">
-          <div className="logo-icon">🩺</div>
-          <h2>CampusCare</h2>
-          <p className="logo-sub">Doctor Portal</p>
-        </div>
-
-        <div className="doctor-info">
-          <div className="avatar">
-            {doctor?.name?.split(" ").map(n => n[0]).join("")}
-          </div>
-          <h3 className="doctor-name">{doctor?.name || "Doctor Name"}</h3>
-          <p className="specialty">Senior Cardiologist</p>
-
-          <div
-            className={`status-badge ${availability === "available" ? "online" : "offline"}`}
-            onClick={toggleAvailability}
-          >
-            ● {availability === "available" ? "Available" : "Unavailable"}
-          </div>
-        </div>
-
-        <nav className="menu">
-          <button
-            className={`menu-item ${activeMenu === "dashboard" ? "active" : ""}`}
-            onClick={() => setActiveMenu("dashboard")}
-          >
-            📊 Dashboard
-          </button>
-
-          <button
-            className={`menu-item ${activeMenu === "appointments" ? "active" : ""}`}
-            onClick={() => setActiveMenu("appointments")}
-          >
-            📅 Appointments
-            {pendingCount > 0 && <span className="badge">{pendingCount}</span>}
-          </button>
-
-          <button
-            className={`menu-item ${activeMenu === "patients" ? "active" : ""}`}
-            onClick={() => setActiveMenu("patients")}
-          >
-            👥 Patients
-          </button>
-
-          <button
-            className={`menu-item ${activeMenu === "settings" ? "active" : ""}`}
-            onClick={() => setActiveMenu("settings")}
-          >
-            ⚙️ Settings
-          </button>
-        </nav>
-
-        <div
-          className={`status-badge ${availability === "available" ? "online" : "offline"}`}
-          onClick={toggleAvailability}
-          style={{ margin: "10px", cursor: "pointer", fontWeight: "bold", textAlign: "center" }}
-        >
-          ● {availability === "available" ? "Go Offline" : "Go Online"}
-        </div>
-        <div className="sidebar-footer">
-          <button className="logout-btn" onClick={handleLogout}>
-            ⏻ Logout
-          </button>
-        </div>
-      </aside>
-
+      {/* Sidebar Variables */}
+      <Sidebar
+        doctor={doctor}
+        availability={availability}
+        toggleAvailability={toggleAvailability}
+        activeMenu={activeMenu}
+        setActiveMenu={setActiveMenu}
+        pendingCount={pendingCount}
+        handleLogout={handleLogout}
+      />
       {/* MAIN CONTENT */}
       <main className="main-content">
 
         <header className="header">
           <div>
-            <h1>Welcome, Doctor</h1>
-            <p className="date">{today}</p>
+            <h1 className="page-title">Appointments Overview</h1>
+            <p className="page-subtitle">{today}</p>
           </div>
         </header>
 
@@ -295,67 +239,23 @@ const DoctorDashboard = () => {
               <h2>Good day 👨‍⚕️</h2>
               <p>You have {pendingCount} pending appointments today.</p>
             </div>
-
-            <div className="stats-cards">
-              <div className="stat-card">
-                <h3>{animatedTotal}</h3>
-                <p>Total Appointments</p>
-              </div>
-
-              <div className="stat-card">
-                <h3>{animatedPending}</h3>
-                <p>Pending</p>
-              </div>
-
-              <div className="stat-card">
-                <h3>{animatedApproved}</h3>
-                <p>Approved</p>
-              </div>
-            </div>
+            <DashboardStats
+              total={animatedTotal}
+              pending={animatedPending}
+              approved={animatedApproved}
+            />
           </section>
         )}
 
         {activeMenu === "appointments" && (
           <section className="page">
             {appointments.map(app => (
-              <div key={app._id} className="appointment-card modern">
-                <div className="appointment-main">
-                  <h4>{app.studentId?.name}</h4>
-                  <p className="problem">problem : {app.problem}</p>
-                  <span className="time">{app.timeSlot}</span>
-                </div>
-
-                <div className="appointment-actions">
-                  {app.status === "pending" ? (
-                    <>
-                      <button
-                        className="btn approve"
-                        onClick={() => updateStatus(app._id, "approved")}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        className="btn reject"
-                        onClick={() => updateStatus(app._id, "rejected")}
-                      >
-                        Reject
-                      </button>
-                    </>
-                  ) : (
-                    <span className={`status-pill ${app.status}`}>
-                      {app.status}
-                    </span>
-                  )}
-
-                  <span
-                    className="delete-icon"
-                    onClick={() => deleteAppointment(app._id)}
-                    title="Delete appointment"
-                  >
-                    🗑️
-                  </span>
-                </div>
-              </div>
+              <AppointmentCard
+                key={app._id}
+                app={app}
+                onApprove={() => updateStatus(app._id, "approved")}
+                onReject={() => updateStatus(app._id, "rejected")}
+              />
             ))}
           </section>
         )}

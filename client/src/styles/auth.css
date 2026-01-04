@@ -429,7 +429,7 @@ body {
 }
 
 .ribbon-green .ribbon-track {
-  animation: marquee-left 15s linear infinite;
+  animation: marquee-left 20s linear infinite;
 }
 
 /* WHITE RIBBON */
@@ -442,7 +442,7 @@ body {
 }
 
 .ribbon-white .ribbon-track {
-  animation: marquee-right 15s linear infinite;
+  animation: marquee-right 20s linear infinite;
 }
 
 /* ===============================

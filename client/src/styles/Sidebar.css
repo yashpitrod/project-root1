@@ -1,0 +1,49 @@
+.sidebar {
+    background: #ffffff;
+    border-right: none;
+    box-shadow: 6px 0 18px rgba(0, 0, 0, 0.03);
+}
+
+.sidebar::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent, #eaecef, transparent);
+}
+
+
+.logo {
+    margin-bottom: 24px;
+}
+
+.logo h2 {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.menu {
+    margin-top: 24px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-weight: 500;
+    color: #555;
+    transition: background 0.2s ease;
+}
+
+.menu-item:hover {
+    background: #f3f6f9;
+}
+
+.menu-item.active {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
