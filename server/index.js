@@ -1,7 +1,5 @@
 import dotenv from "dotenv";
-dotenv.config({
-  path: `.env.${process.env.NODE_ENV || "development"}`
-});
+dotenv.config();
 
 import http from "http";
 import { Server } from "socket.io";
