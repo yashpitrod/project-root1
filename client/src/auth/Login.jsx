@@ -181,6 +181,11 @@ const Login = () => {
                 <button type="submit" className="btn btn-primary">
                   Sign In
                 </button>
+                <div className="auth-footer" style={{ marginTop: "12px" }}>
+                  <Link to="/forgot-password" className="auth-link">
+                  Forgot password?
+                  </Link>
+                </div>
               </form>
 
               <div className="auth-footer">
