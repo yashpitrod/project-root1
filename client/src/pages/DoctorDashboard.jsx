@@ -251,17 +251,13 @@ const DoctorDashboard = () => {
           </button>
 
           <button
-            className={`menu-item ${activeMenu === "patients" ? "active" : ""}`}
-            onClick={() => setActiveMenu("patients")}
-          >
-            👥 Patients
-          </button>
-
-          <button
             className={`menu-item ${activeMenu === "settings" ? "active" : ""}`}
             onClick={() => setActiveMenu("settings")}
           >
             ⚙️ Settings
+          </button>
+          <button className="logout-btn" onClick={handleLogout}>
+            ⏻ Logout
           </button>
         </nav>
 
@@ -271,11 +267,6 @@ const DoctorDashboard = () => {
           style={{ margin: "10px", cursor: "pointer", fontWeight: "bold", textAlign: "center" }}
         >
           ● {availability === "available" ? "Go Offline" : "Go Online"}
-        </div>
-        <div className="sidebar-footer">
-          <button className="logout-btn" onClick={handleLogout}>
-            ⏻ Logout
-          </button>
         </div>
       </aside>
 

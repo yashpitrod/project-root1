@@ -554,8 +554,8 @@ const StudentDashboard = () => {
 
               <div className="recent-request-body">
                 <div className="request-row">
-                  <span className="label">Problem</span>
-                  <span className="value">{recentRequest.problem}</span>
+                  <span className="label">Problem-</span>
+                  <span className="value"> {translatedText}</span>
                 </div>
 
                 <div className="request-row">

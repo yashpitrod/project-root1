@@ -1,3 +1,10 @@
+* {
+    font-family: "Roboto Condensed", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-style: normal;
+}
+
 .profile-container {
     min-height: 100vh;
     display: flex;

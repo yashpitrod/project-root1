@@ -1,3 +1,10 @@
+*{
+  font-family: "Roboto Condensed", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-style: normal;
+}
+
 .history-page {
   min-height: 100vh;
   padding: 32px;
