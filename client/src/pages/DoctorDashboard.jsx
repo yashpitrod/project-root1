@@ -32,7 +32,7 @@ const DoctorDashboard = () => {
 
   /* INIT SOCKET */
   useEffect(() => {
-    socketRef.current = io("http://localhost:5000", {
+    socketRef.current = io(`${API_BASE_URL}`, {
       transports: ["websocket"],
     });
 
@@ -77,7 +77,7 @@ const DoctorDashboard = () => {
   useEffect(() => {
     if (!token) return;
 
-    fetch("http://localhost:5000/api/requests/doctor", {
+    fetch(`${API_BASE_URL}/api/requests/doctor`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -94,7 +94,7 @@ const DoctorDashboard = () => {
   const updateStatus = async (id, status) => {
     try {
       const res = await fetch(
-        `http://localhost:5000/api/requests/${id}/status`,
+        `${API_BASE_URL}/api/requests/${id}/status`,
         {
           method: "PATCH",
           headers: {
@@ -114,7 +114,7 @@ const DoctorDashboard = () => {
 
         try {
           const res = await fetch(
-            `http://localhost:5000/api/requests/${id}`,
+            `${API_BASE_URL}/api/requests/${id}`,
             {
               method: "DELETE",
               headers: {
@@ -157,7 +157,7 @@ const DoctorDashboard = () => {
   const toggleAvailability = async () => {
     const newStatus = availability === "available" ? "busy" : "available";
 
-    const res = await fetch("http://localhost:5000/api/doctors/status", {
+    const res = await fetch(`${API_BASE_URL}/api/doctors/status`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

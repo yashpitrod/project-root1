@@ -288,7 +288,7 @@ const StudentDashboard = () => {
       }
     }
 
-    const res = await fetch("http://localhost:5000/api/requests", {
+    const res = await fetch(`${API_BASE_URL}/api/requests`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

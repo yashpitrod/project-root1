@@ -6,6 +6,7 @@ import DoctorDashboard from '../pages/DoctorDashboard';
 import StudentProfile from '../pages/StudentProfile';
 import RequestHistory from "../pages/RequestHistory";
 import ForgotPassword from "../auth/ForgotPassword";
+import ProtectedRoute from '../auth/ProtectedRoute';
 
 const AppRouter = () => {
 
@@ -15,10 +16,10 @@ const AppRouter = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/student" element={<StudentDashboard />} />
-        <Route path="/doctor" element={<DoctorDashboard />} />
-        <Route path="/student/profile" element={<StudentProfile />} />
-        <Route path="/student/history" element={<RequestHistory />} />
+        <Route path="/student" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+        <Route path="/doctor" element={<ProtectedRoute><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/student/profile" element={<ProtectedRoute><StudentProfile /></ProtectedRoute>} />
+        <Route path="/student/history" element={<ProtectedRoute><RequestHistory /></ProtectedRoute>} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
       </Routes>
     </BrowserRouter>

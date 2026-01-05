@@ -7,7 +7,7 @@ import {
 import { auth } from "../auth/firebase";
 import campusImg from "../assets/campus.png";
 
-
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 const Register = () => {
   const navigate = useNavigate();
 
@@ -53,7 +53,7 @@ const Register = () => {
 
       // No email verification, just send user info to backend
       const token = await userCred.user.getIdToken();
-      await fetch("http://localhost:5000/api/auth/register", {
+      await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -11,7 +11,7 @@ const RequestHistory = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/requests/my", {
+        const res = await fetch(`${API_BASE_URL}/api/requests/my`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
