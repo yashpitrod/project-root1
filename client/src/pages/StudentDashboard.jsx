@@ -451,6 +451,9 @@ const StudentDashboard = () => {
                         ? "Available"
                         : "Unavailable"}
                     </span>
+                    <div>
+                      queue: 0
+                    </div>
                   </div>
                 ))}
               </div>
