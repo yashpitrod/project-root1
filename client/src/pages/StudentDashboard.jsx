@@ -123,7 +123,7 @@ const StudentDashboard = () => {
   useEffect(() => {
     const fetchLatestRequest = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/requests/my", {
+        const res = await fetch(`${API_BASE_URL}/api/requests/my`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -176,7 +176,7 @@ const StudentDashboard = () => {
 
   //4. for fetching doctors list
   useEffect(() => {
-    fetch("http://localhost:5000/api/doctors")
+    fetch(`${API_BASE_URL}/api/doctors`)
       .then(res => res.json())
       .then(data => setDoctors(data))
       .catch(err => console.error("Failed to load doctors", err));
@@ -235,7 +235,7 @@ const StudentDashboard = () => {
     if (!problem.trim() || translated) return;
 
     try {
-      const res = await fetch("http://localhost:5000/api/translate", {
+      const res = await fetch(`${API_BASE_URL}/api/translate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -268,7 +268,7 @@ const StudentDashboard = () => {
 
     if (!translated) {
       try {
-        const res = await fetch("http://localhost:5000/api/translate", {
+        const res = await fetch(`${API_BASE_URL}/api/translate`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
