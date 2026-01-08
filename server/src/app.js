@@ -11,7 +11,8 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://project-root1.vercel.app"
+    "https://campus-care-gules.vercel.app",
+    process.env.FRONTEND_URL
   ],
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   credentials: true
