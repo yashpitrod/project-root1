@@ -9,19 +9,15 @@ import doctorRoutes from "./routes/doctorRoutes.js";
 const app = express();
 
 app.use(cors({
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST", "PUT","PATCH", "DELETE"],
-    credentials: true
-}));
-
-app.use(express.json());
-app.use(cors({
   origin: [
     "http://localhost:5173",
     "https://project-root1.vercel.app"
   ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   credentials: true
 }));
+
+app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/translate", translateRoutes);

@@ -32,6 +32,9 @@ const StudentDashboard = () => {
   const [doctors, setDoctors] = useState([]);
   const [recentRequest, setRecentRequest] = useState(null);
 
+  //Url to call backend API
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
   // Navigation hook
   const navigate = useNavigate();
 

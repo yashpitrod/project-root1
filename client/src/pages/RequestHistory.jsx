@@ -8,6 +8,9 @@ const RequestHistory = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
+  //Url to call backend API
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {

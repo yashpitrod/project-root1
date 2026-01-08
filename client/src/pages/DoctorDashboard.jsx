@@ -15,6 +15,9 @@ const DoctorDashboard = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [availability, setAvailability] = useState("available");
 
+  //Url to call backend API
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
   const [settings, setSettings] = useState({
     notifications: true,
     autoConfirm: false,

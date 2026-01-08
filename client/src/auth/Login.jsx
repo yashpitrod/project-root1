@@ -13,6 +13,9 @@ const Login = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  //Url to call backend API
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
   const validateEmail = (email) => {
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
     return gmailRegex.test(email);
