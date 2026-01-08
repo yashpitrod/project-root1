@@ -16,12 +16,7 @@ import doctorSavitri from '../assets/blank-profile-picture.jpg';
 import doctorKapil from '../assets/blank-profile-picture.jpg';
 
 //Url to call backend API
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-const socket = io(`${API_BASE_URL}`, {
-  transports: ["websocket"],
-});
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const StudentDashboard = () => {
   // Required State Variables
@@ -163,19 +158,13 @@ const StudentDashboard = () => {
     fetchLatestRequest();
   }, []);
 
-  //3. for auth check and joining socket room
+  //3. for auth check
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
       navigate("/login");
     }
   }, [navigate]);
-  useEffect(() => {
-    if (!userId) return;
-
-    socket.emit("join-room", userId);
-    console.log("🟢 Student joined socket room:", userId);
-  }, [userId]);
 
   //4. for fetching doctors list
   useEffect(() => {
@@ -185,8 +174,24 @@ const StudentDashboard = () => {
       .catch(err => console.error("Failed to load doctors", err));
   }, []);
 
-  //5. for listening to socket events
+  //5. Initialize socket and handle all socket events
   useEffect(() => {
+    if (!API_BASE_URL) {
+      console.error('API_BASE_URL is not defined');
+      return;
+    }
+
+    const socket = io(API_BASE_URL, {
+      transports: ["websocket"],
+    });
+
+    // Join socket room when userId is available
+    if (userId) {
+      socket.emit("join-room", userId);
+      console.log("🟢 Student joined socket room:", userId);
+    }
+
+    // Listen to doctor status updates
     socket.on("doctor-status-updated", ({ doctorId, availability }) => {
       setDoctors((prevDoctors) =>
         prevDoctors.map((doc) =>
@@ -196,13 +201,8 @@ const StudentDashboard = () => {
         )
       );
     });
-    return () => {
-      socket.off("doctor-status-updated");
-    };
-  }, []);
 
-  //6. for listening to request status updates
-  useEffect(() => {
+    // Listen to request status updates
     socket.on("request-status-updated", ({ requestId, status }) => {
       console.log("📡 Student received status update:", requestId, status);
 
@@ -222,9 +222,11 @@ const StudentDashboard = () => {
     });
 
     return () => {
+      socket.off("doctor-status-updated");
       socket.off("request-status-updated");
+      socket.disconnect();
     };
-  }, []);
+  }, [userId]);
 
   // -------------------- EVENT HANDLERS --------------------
   const handleLogout = () => {

@@ -7,7 +7,7 @@ import {
 import { auth } from "../auth/firebase";
 import campusImg from "../assets/campus.png";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 const Register = () => {
   const navigate = useNavigate();
 
