@@ -15,6 +15,9 @@ import doctorAnirban from '../assets/blank-profile-picture.jpg';
 import doctorSavitri from '../assets/blank-profile-picture.jpg';
 import doctorKapil from '../assets/blank-profile-picture.jpg';
 
+//Url to call backend API
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 const socket = io(`${API_BASE_URL}`, {
   transports: ["websocket"],
 });
@@ -31,9 +34,6 @@ const StudentDashboard = () => {
   const [lastVisitDate, setLastVisitDate] = useState(null);
   const [doctors, setDoctors] = useState([]);
   const [recentRequest, setRecentRequest] = useState(null);
-
-  //Url to call backend API
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
   // Navigation hook
   const navigate = useNavigate();
