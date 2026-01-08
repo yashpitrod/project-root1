@@ -39,7 +39,7 @@ const Login = () => {
       localStorage.setItem("token", token);
 
       // 2️⃣ Get role from backend
-      const res = await fetch("http://localhost:5000/api/auth/me", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

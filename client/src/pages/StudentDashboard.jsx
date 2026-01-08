@@ -15,7 +15,7 @@ import doctorAnirban from '../assets/blank-profile-picture.jpg';
 import doctorSavitri from '../assets/blank-profile-picture.jpg';
 import doctorKapil from '../assets/blank-profile-picture.jpg';
 
-const socket = io("http://localhost:5000", {
+const socket = io(`${API_BASE_URL}`, {
   transports: ["websocket"],
 });
 

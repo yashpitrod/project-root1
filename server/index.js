@@ -17,16 +17,26 @@ const server = http.createServer(app);
 /* 🔴 Attach Socket.IO */
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "PATCH","DELETE"],
+    origin: [
+      "http://localhost:5173",
+      process.env.FRONTEND_URL,
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true,
   },
+  transports: ["websocket", "polling"], // IMPORTANT for Render
 });
 
 /* 🔗 SOCKET CONNECTION */
 io.on("connection", (socket) => {
+  console.log("🔌 Socket connected:", socket.id);
 
   socket.on("join-room", (userId) => {
     socket.join(userId);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ Socket disconnected:", socket.id);
   });
 });
 

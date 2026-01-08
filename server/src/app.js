@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://your-frontend.vercel.app"
+    "https://project-root1.vercel.app"
   ],
   credentials: true
 }));
