@@ -14,7 +14,7 @@ const Login = () => {
   const navigate = useNavigate();
 
   //Url to call backend API
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
   const validateEmail = (email) => {
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
@@ -186,7 +186,7 @@ const Login = () => {
                 </button>
                 <div className="auth-footer" style={{ marginTop: "12px" }}>
                   <Link to="/forgot-password" className="auth-link">
-                  Forgot password?
+                    Forgot password?
                   </Link>
                 </div>
               </form>
