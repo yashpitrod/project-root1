@@ -365,33 +365,3 @@ body {
     align-self: flex-end;
   }
 }
-
-@media (max-width: 768px) {
-  .sidebar {
-    padding: 0.5rem;
-  }
-
-  .doctor-info,
-  .logo-sub,
-  .specialty {
-    display: none;
-  }
-
-  .menu {
-    display: flex;
-    gap: 8px;
-  }
-
-  .menu-item {
-    border-radius: 10px;
-    font-size: 0.8rem;
-    padding: 10px;
-  }
-}
-
-/* Ensure touch targets are at least 44px high */
-.btn,
-.menu-item,
-.status-badge {
-  min-height: 44px;
-}
