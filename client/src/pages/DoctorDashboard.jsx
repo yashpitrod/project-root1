@@ -108,34 +108,6 @@ const DoctorDashboard = () => {
         }
       );
 
-      const deleteAppointment = async (id) => {
-        const confirmDelete = window.confirm(
-          "Are you sure you want to delete this appointment?"
-        );
-
-        if (!confirmDelete) return;
-
-        try {
-          const res = await fetch(
-            `${API_BASE_URL}/api/requests/${id}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          const data = await res.json();
-
-          if (data.success) {
-            setAppointments(prev => prev.filter(app => app._id !== id));
-          }
-        } catch (error) {
-          console.error("Delete failed:", error);
-        }
-      };
-
       if (!res.ok) {
         const text = await res.text();
         console.error("Server error:", text);
@@ -153,6 +125,35 @@ const DoctorDashboard = () => {
       }
     } catch (err) {
       console.error("Status update failed:", err);
+    }
+  };
+
+  // To delete appointment
+  const deleteAppointment = async (id) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this appointment?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/requests/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        setAppointments(prev => prev.filter(app => app._id !== id));
+      }
+    } catch (error) {
+      console.error("Delete failed:", error);
     }
   };
 
