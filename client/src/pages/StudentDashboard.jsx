@@ -32,6 +32,9 @@ const StudentDashboard = () => {
   // State to track doctor queues (for future use)
   const [doctorQueues, setDoctorQueues] = useState({});
 
+  // State to control appointment banner visibility
+  const [showAppointmentBanner, setShowAppointmentBanner] = useState(false);
+
   // Navigation hook
   const navigate = useNavigate();
 
@@ -113,11 +116,53 @@ const StudentDashboard = () => {
   //                syncing localStorage
   //1. for fetching recent request from localStorage
   useEffect(() => {
-    const savedRequest = localStorage.getItem("recentRequest");
-    if (savedRequest) {
-      setRecentRequest(JSON.parse(savedRequest));
-    }
-  }, []);
+    const fetchLatestRequest = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/requests/my`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (data.success && data.requests.length > 0) {
+          const latest = data.requests[0];
+
+          const enriched = {
+            ...latest,
+            doctorName: latest.doctorId?.name || "Doctor",
+          };
+
+          // ✅ Always show last request
+          setRecentRequest(enriched);
+          setAppointmentStatus(enriched.status);
+          localStorage.setItem("recentRequest", JSON.stringify(enriched));
+
+          // ✅ Last visit = last approved request
+          const approved = data.requests.find(
+            (r) => r.status === "approved"
+          );
+          setLastVisitDate(approved ? new Date(approved.createdAt) : null);
+
+          // ❌ IMPORTANT: DO NOT show banner on relogin
+          setShowAppointmentBanner(false);
+        } else {
+          // User truly has NO requests in DB
+          setRecentRequest(null);
+          setAppointmentStatus(null);
+          setLastVisitDate(null);
+          localStorage.removeItem("recentRequest");
+
+          setShowAppointmentBanner(false);
+        }
+      } catch (err) {
+        console.error("Failed to fetch latest request:", err);
+      }
+    };
+
+    if (token) fetchLatestRequest();
+  }, [token]);
 
   //2. for fetching latest request from server
   useEffect(() => {
@@ -252,8 +297,8 @@ const StudentDashboard = () => {
         return updated;
       });
 
-      // ✅ Top banner update
       setAppointmentStatus(status);
+      setShowAppointmentBanner(true);
     });
 
     return () => {
@@ -268,6 +313,7 @@ const StudentDashboard = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("recentRequest");
+    setShowAppointmentBanner(false);
     navigate("/login");
   };
 
@@ -358,6 +404,9 @@ const StudentDashboard = () => {
     setRecentRequest(newRequest);
     localStorage.setItem("recentRequest", JSON.stringify(newRequest));
     setAppointmentStatus("pending");
+
+    // Show appointment banner
+    setShowAppointmentBanner(true);
   };
 
 
@@ -524,26 +573,32 @@ const StudentDashboard = () => {
             </button>
 
             {/* Appointment Status */}
-            {appointmentStatus && (
+            {showAppointmentBanner && recentRequest && appointmentStatus && (
               <div className={`appointment-status ${appointmentStatus}`}>
                 <div className="status-icon">
                   {appointmentStatus === 'pending' ? (
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <svg viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                       <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" />
                     </svg>
                   )}
                 </div>
+
                 <div className="status-text">
-                  <h4>{appointmentStatus === 'pending' ? 'Pending Approval' : 'Appointment Confirmed!'}</h4>
+                  <h4>
+                    {appointmentStatus === "pending"
+                      ? "Pending Approval"
+                      : "Appointment Confirmed!"}
+                  </h4>
+
                   <p>
-                    {appointmentStatus === 'pending'
-                      ? 'Waiting for doctor confirmation...'
-                      : `Your appointment with ${doctors.find(d => d._id === selectedDoctor)?.name} at ${selectedTimeSlot} is confirmed.`}
+                    {appointmentStatus === "pending"
+                      ? "Waiting for doctor confirmation..."
+                      : `Your appointment with ${recentRequest.doctorName} at ${recentRequest.timeSlot} is confirmed.`}
                   </p>
                 </div>
               </div>
