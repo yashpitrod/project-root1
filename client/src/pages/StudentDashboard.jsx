@@ -29,6 +29,8 @@ const StudentDashboard = () => {
   const [lastVisitDate, setLastVisitDate] = useState(null);
   const [doctors, setDoctors] = useState([]);
   const [recentRequest, setRecentRequest] = useState(null);
+  // State to track doctor queues (for future use)
+  const [doctorQueues, setDoctorQueues] = useState({});
 
   // Navigation hook
   const navigate = useNavigate();
@@ -173,6 +175,39 @@ const StudentDashboard = () => {
       .then(data => setDoctors(data))
       .catch(err => console.error("Failed to load doctors", err));
   }, []);
+
+  // Fetch doctor queues whenever doctors list changes
+  useEffect(() => {
+    if (!doctors.length) return;
+
+    const fetchQueues = async () => {
+      const token = localStorage.getItem("token");
+      const queueMap = {};
+
+      await Promise.all(
+        doctors.map(async (doctor) => {
+          try {
+            const res = await fetch(
+              `${API_BASE_URL}/api/doctors/${doctor._id}/queue`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+            const data = await res.json();
+            queueMap[doctor._id] = data.queue ?? 0;
+          } catch {
+            queueMap[doctor._id] = 0;
+          }
+        })
+      );
+
+      setDoctorQueues(queueMap);
+    };
+
+    fetchQueues();
+  }, [doctors]);
 
   //5. Initialize socket and handle all socket events
   useEffect(() => {
@@ -457,7 +492,7 @@ const StudentDashboard = () => {
                         : "Unavailable"}
                     </span>
                     <div>
-                      queue: 0
+                      queue: {doctorQueues[doctor._id] ?? 0}
                     </div>
                   </div>
                 ))}

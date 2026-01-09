@@ -1,8 +1,30 @@
 import express from "express";
 import verifyToken from "../middlewares/verifyToken.js";
 import User from "../models/User.js";
+import Request from "../models/Request.js";
 
 const router = express.Router();
+/* =========================================
+   GET DOCTOR QUEUE (last 1 hour approved)
+========================================= */
+router.get("/:doctorId/queue", verifyToken, async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+    const queueCount = await Request.countDocuments({
+      doctorId,
+      status: "approved",
+      approvedAt: { $gte: oneHourAgo },
+    });
+
+    res.json({ queue: queueCount });
+  } catch (err) {
+    console.error("Queue fetch error:", err.message);
+    res.status(500).json({ message: "Failed to fetch queue" });
+  }
+});
 
 /* =========================================
    UPDATE DOCTOR AVAILABILITY (DOCTOR ONLY)

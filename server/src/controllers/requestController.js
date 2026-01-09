@@ -131,6 +131,11 @@ export const updateRequestStatus = async (req, res) => {
     }
 
     request.status = status;
+
+    if (status === "approved") {
+      request.approvedAt = new Date(); // Set the approvedAt timestamp
+    }
+
     await request.save();
 
     /* 🔥 SOCKET: notify student in real-time */

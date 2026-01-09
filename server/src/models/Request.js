@@ -25,6 +25,10 @@ const requestSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+    // Timestamp when the request was approved
+    approvedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
