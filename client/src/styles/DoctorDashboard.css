@@ -341,3 +341,57 @@ body {
 .delete-icon:hover {
   transform: scale(1.2);
 }
+
+/* Responsive adjustments for modern appointment card */
+@media (max-width: 640px) {
+  .appointment-card.modern {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .appointment-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .appointment-actions .btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 0.85rem;
+  }
+
+  .delete-icon {
+    align-self: flex-end;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    padding: 0.5rem;
+  }
+
+  .doctor-info,
+  .logo-sub,
+  .specialty {
+    display: none;
+  }
+
+  .menu {
+    display: flex;
+    gap: 8px;
+  }
+
+  .menu-item {
+    border-radius: 10px;
+    font-size: 0.8rem;
+    padding: 10px;
+  }
+}
+
+/* Ensure touch targets are at least 44px high */
+.btn,
+.menu-item,
+.status-badge {
+  min-height: 44px;
+}
