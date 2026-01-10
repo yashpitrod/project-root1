@@ -1,5 +1,5 @@
 import express from "express";
-import verifyToken from "../middlewares/verifyToken.js";
+import { verifyFirebaseOnly, verifyToken } from "../middleware/authMiddleware.js";
 import User from "../models/User.js";
 
 const router = express.Router();
@@ -14,7 +14,7 @@ const allowedDoctors = [
 ];
 
 // ---------------- REGISTER ----------------
-router.post("/register", verifyToken, async (req, res) => {
+router.post("/register", verifyFirebaseOnly, async (req, res) => {
   try {
     const { uid, email, name } = req.firebaseUser;
 
