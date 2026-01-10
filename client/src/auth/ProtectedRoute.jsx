@@ -4,26 +4,22 @@ import { auth } from "./firebase";
 
 const ProtectedRoute = ({ children }) => {
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [authenticated, setAuthenticated] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
-      setUser(firebaseUser);
+      setAuthenticated(!!firebaseUser);
       setLoading(false);
     });
-    return () => unsubscribe();
+    return unsubscribe;
   }, []);
 
   if (loading) {
-    return (
-      <div style={{ textAlign: "center", marginTop: "20vh" }}>
-        <h3>Loading...</h3>
-      </div>
-    );
+    return <div style={{ textAlign: "center", marginTop: "20vh" }}>Loading...</div>;
   }
 
-  if (!user) {
+  if (!authenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 

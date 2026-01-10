@@ -26,7 +26,8 @@ export const createRequest = async (req, res) => {
     const request = await Request.create({
       studentId: req.user._id,
       doctorId,
-      problem: finalEnglishText,
+      originalProblem: problem,        // 👈 RAW USER INPUT
+      problem: finalEnglishText,        // 👈 ENGLISH ONLY,
       timeSlot,
       status: "pending",
     });

@@ -14,7 +14,11 @@ const requestSchema = new mongoose.Schema(
     },
     problem: {
       type: String,
-      required: true,
+      required: true, // English (final)
+    },
+    originalProblem: {
+      type: String,
+      required: true, // What student typed
     },
     timeSlot: {
       type: String,

@@ -128,84 +128,36 @@ const StudentDashboard = () => {
 
         if (data.success && data.requests.length > 0) {
           const latest = data.requests[0];
-
           const enriched = {
             ...latest,
             doctorName: latest.doctorId?.name || "Doctor",
           };
 
-          // ✅ Always show last request
           setRecentRequest(enriched);
           setAppointmentStatus(enriched.status);
-          localStorage.setItem("recentRequest", JSON.stringify(enriched));
-
-          // ✅ Last visit = last approved request
-          const approved = data.requests.find(
-            (r) => r.status === "approved"
+          setLastVisitDate(
+            data.requests.find(r => r.status === "approved")
+              ? new Date(
+                data.requests.find(r => r.status === "approved").createdAt
+              )
+              : null
           );
-          setLastVisitDate(approved ? new Date(approved.createdAt) : null);
 
-          // ❌ IMPORTANT: DO NOT show banner on relogin
           setShowAppointmentBanner(false);
         } else {
-          // User truly has NO requests in DB
           setRecentRequest(null);
           setAppointmentStatus(null);
           setLastVisitDate(null);
-          localStorage.removeItem("recentRequest");
-
-          setShowAppointmentBanner(false);
         }
       } catch (err) {
-        console.error("Failed to fetch latest request:", err);
+        console.error(err);
       }
     };
 
     if (token) fetchLatestRequest();
   }, [token]);
 
-  //2. for fetching latest request from server
-  useEffect(() => {
-    const fetchLatestRequest = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/requests/my`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json();
-
-        if (data.success && data.requests.length > 0) {
-          const latest = data.requests[0];
-
-          // ✅ enrich request with doctor name
-          const enriched = {
-            ...latest,
-            doctorName: latest.doctorId?.name || "Doctor",
-          };
-
-          setRecentRequest(enriched);
-          setAppointmentStatus(enriched.status);
-          localStorage.setItem("recentRequest", JSON.stringify(enriched));
-
-          // ✅ compute last approved visit
-          const approved = data.requests.find(
-            (r) => r.status === "approved"
-          );
-          if (approved) {
-            setLastVisitDate(new Date(approved.createdAt));
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch latest request:", err);
-      }
-    };
-
-    fetchLatestRequest();
-  }, []);
-
-  //3. for auth check
+  //2. for auth check
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -213,7 +165,7 @@ const StudentDashboard = () => {
     }
   }, [navigate]);
 
-  //4. for fetching doctors list
+  //3. for fetching doctors list
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/doctors`)
       .then(res => res.json())
@@ -318,7 +270,7 @@ const StudentDashboard = () => {
   };
 
   const handleTranslate = async () => {
-    if (!problem.trim() || translated) return;
+    if (!problem.trim()) return;
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/translate`, {
@@ -373,7 +325,6 @@ const StudentDashboard = () => {
         console.error("Auto-translate failed");
       }
     }
-
     const res = await fetch(`${API_BASE_URL}/api/requests`, {
       method: "POST",
       headers: {
@@ -401,9 +352,18 @@ const StudentDashboard = () => {
       createdAt: new Date().toISOString(),
     };
 
+    // for updating state and localStorage
     setRecentRequest(newRequest);
-    localStorage.setItem("recentRequest", JSON.stringify(newRequest));
     setAppointmentStatus("pending");
+    setShowAppointmentBanner(true);
+
+    localStorage.setItem("recentRequest", JSON.stringify(newRequest));
+    // reset form
+    setProblem("");
+    setTranslated(false);
+    setTranslatedText("");
+    setSelectedDoctor(null);
+    setSelectedTimeSlot("");
 
     // Show appointment banner
     setShowAppointmentBanner(true);
@@ -476,7 +436,11 @@ const StudentDashboard = () => {
                 className="problem-textarea"
                 placeholder="अपनी समस्या यहाँ लिखें... / Write your problem here..."
                 value={problem}
-                onChange={(e) => setProblem(e.target.value)}
+                onChange={(e) => {
+                  setProblem(e.target.value);
+                  setTranslated(false);
+                  setTranslatedText("");
+                }}
                 rows={5}
               />
             </div>
@@ -653,7 +617,7 @@ const StudentDashboard = () => {
               <div className="recent-request-body">
                 <div className="request-row">
                   <span className="label">Problem-</span>
-                  <span className="value"> {translatedText}</span>
+                  <span className="value">{recentRequest.problem}</span>
                 </div>
 
                 <div className="request-row">
