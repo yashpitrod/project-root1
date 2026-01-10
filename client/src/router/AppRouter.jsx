@@ -7,6 +7,7 @@ import StudentProfile from '../pages/StudentProfile';
 import RequestHistory from "../pages/RequestHistory";
 import ForgotPassword from "../auth/ForgotPassword";
 import ProtectedRoute from '../auth/ProtectedRoute';
+import NotFound from '../pages/NotFound';
 
 const AppRouter = () => {
 
@@ -21,8 +22,10 @@ const AppRouter = () => {
         <Route path="/student/profile" element={<ProtectedRoute><StudentProfile /></ProtectedRoute>} />
         <Route path="/student/history" element={<ProtectedRoute><RequestHistory /></ProtectedRoute>} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-      </Routes>
-    </BrowserRouter>
+        {/* ✅ fallback */}
+        <Route path="*" element={<NotFound />} />
+    </Routes>
+    </BrowserRouter >
   );
 };
 
