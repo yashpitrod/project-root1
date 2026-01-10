@@ -29,11 +29,7 @@ const verifyToken = async (req, res, next) => {
     /* 🔥 MongoDB user (required for protected routes) */
     const mongoUser = await User.findOne({ uid: decoded.uid });
 
-    if (!mongoUser) {
-      return res.status(401).json({
-        message: "User not registered in database",
-      });
-    }
+    req.user = mongoUser || null;
 
     /* ✅ Attach Mongo user (THIS FIXES req.user._id) */
     req.user = mongoUser;

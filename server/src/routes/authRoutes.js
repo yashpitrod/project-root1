@@ -18,8 +18,19 @@ router.post("/register", verifyFirebaseOnly, async (req, res) => {
   try {
     const { uid, email, name } = req.firebaseUser;
 
-    let user = await User.findOne({ uid });
-    if (user) return res.json(user);
+    // ✅ Check by UID OR email
+    let user = await User.findOne({
+      $or: [{ uid }, { email }]
+    });
+
+    if (user) {
+      // 🔥 Ensure UID is attached if missing
+      if (!user.uid) {
+        user.uid = uid;
+        await user.save();
+      }
+      return res.status(200).json(user);
+    }
 
     const isDoctor = allowedDoctors.includes(email);
 
@@ -27,8 +38,8 @@ router.post("/register", verifyFirebaseOnly, async (req, res) => {
     const role = isDoctor
       ? "doctor"
       : allowedRoles.includes(req.body.role)
-      ? req.body.role
-      : "student";
+        ? req.body.role
+        : "student";
 
     user = await User.create({
       uid,
@@ -40,7 +51,15 @@ router.post("/register", verifyFirebaseOnly, async (req, res) => {
 
     res.status(201).json(user);
   } catch (err) {
-    console.error(err);
+    console.error("REGISTER ERROR:", err);
+
+    // ✅ Handle duplicate email safely
+    if (err.code === 11000) {
+      return res.status(409).json({
+        message: "User already exists. Please login."
+      });
+    }
+
     res.status(500).json({ message: "Registration failed" });
   }
 });
@@ -53,9 +72,14 @@ router.get("/me", verifyToken, async (req, res) => {
 
     let user = await User.findOne({ uid });
 
+    // AUTO-CREATE USER IF MISSING
     if (!user) {
-      return res.status(404).json({
-        message: "User not registered. Please register first.",
+      user = await User.create({
+        uid,
+        email,
+        name,
+        role: isDoctor ? "doctor" : "student",
+        isApproved: isDoctor,
       });
     }
 
@@ -72,6 +96,5 @@ router.get("/me", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user" });
   }
 });
-
 
 export default router;

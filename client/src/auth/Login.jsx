@@ -42,11 +42,29 @@ const Login = () => {
       localStorage.setItem("token", token);
 
       // 2️⃣ Get role from backend
-      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      let res = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      // If user not registered, auto-register
+      if (res.status === 404 || res.status === 401) {
+        await fetch(`${API_BASE_URL}/api/auth/register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ role: "student" }),
+        });
+
+        res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
 
       if (!res.ok) {
         const errData = await res.json();
