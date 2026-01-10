@@ -66,8 +66,20 @@ const DoctorDashboard = () => {
   useEffect(() => {
     if (!socketRef.current) return;
 
-    socketRef.current.on("new-request", ({ request }) => {
-      setAppointments(prev => [request, ...prev]);
+    socketRef.current.on("new-request", async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/requests/doctor`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await res.json();
+        if (data.success) {
+          setAppointments(data.requests);
+        }
+      } catch (err) {
+        console.error("Failed to refresh doctor requests:", err);
+      }
     });
 
     return () => {
@@ -316,7 +328,15 @@ const DoctorDashboard = () => {
               <div key={app._id} className="appointment-card modern">
                 <div className="appointment-main">
                   <h4>{app.studentId?.name}</h4>
-                  <p className="problem">problem : {app.problem}</p>
+                  <p className="problem">
+                    <strong>Problem (English):</strong> {app.problem}
+                  </p>
+
+                  {app.originalProblem && app.originalProblem !== app.problem && (
+                    <p className="problem original">
+                      <strong>Original:</strong> {app.originalProblem}
+                    </p>
+                  )}
                   <span className="time">{app.timeSlot}</span>
                 </div>
 
