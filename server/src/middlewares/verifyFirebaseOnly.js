@@ -5,11 +5,15 @@ const verifyFirebaseOnly = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.error("❌ No Authorization header");
       return res.status(401).json({ message: "No token provided" });
     }
 
     const token = authHeader.split(" ")[1];
+
     const decoded = await admin.auth().verifyIdToken(token);
+
+    console.log("✅ FIREBASE TOKEN VERIFIED:", decoded.email);
 
     req.firebaseUser = {
       uid: decoded.uid,
@@ -19,8 +23,8 @@ const verifyFirebaseOnly = async (req, res, next) => {
 
     next();
   } catch (err) {
-    console.error("Firebase verify failed:", err.message);
-    res.status(401).json({ message: "Invalid or expired token" });
+    console.error("❌ FIREBASE ADMIN VERIFY FAILED:", err.message);
+    return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
 

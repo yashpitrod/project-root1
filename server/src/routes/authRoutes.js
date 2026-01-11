@@ -16,6 +16,8 @@ const allowedDoctors = [
 
 // ---------------- REGISTER ----------------
 router.post("/register", verifyFirebaseOnly, async (req, res) => {
+  console.log("🔥 REGISTER ROUTE HIT");
+  console.log("🔥 FIREBASE USER:", req.firebaseUser);
   try {
     const { uid, email, name } = req.firebaseUser;
 
