@@ -344,7 +344,8 @@ const StudentDashboard = () => {
 
         const newRequest = {
             _id: data.request._id,
-            problem: textToSend,
+            problem: data.request.problem,              // English 
+            originalProblem: data.request.originalProblem,
             doctorId: selectedDoctor,
             doctorName: doctorObj?.name || "Doctor",
             timeSlot: selectedTimeSlot,
