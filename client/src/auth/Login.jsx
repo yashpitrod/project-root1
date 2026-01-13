@@ -48,22 +48,12 @@ const Login = () => {
         },
       });
 
-      // If user not registered, auto-register
-      if (res.status === 404 || res.status === 401) {
-        await fetch(`${API_BASE_URL}/api/auth/register`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ role: "student" }),
-        });
+      if (res.status === 404) {
+        throw new Error("Account not found. Please register first.");
+      }
 
-        res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      if (res.status === 401) {
+        throw new Error("Session expired. Please login again.");
       }
 
       if (!res.ok) {

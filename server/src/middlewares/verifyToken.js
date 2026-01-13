@@ -30,10 +30,6 @@ const verifyToken = async (req, res, next) => {
     const mongoUser = await User.findOne({ uid: decoded.uid });
 
     req.user = mongoUser || null;
-
-    /* ✅ Attach Mongo user (THIS FIXES req.user._id) */
-    req.user = mongoUser;
-
     next();
   } catch (error) {
     console.error("Auth error:", error.message);
