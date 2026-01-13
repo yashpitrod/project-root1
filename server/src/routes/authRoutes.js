@@ -69,35 +69,7 @@ router.post("/register", verifyFirebaseOnly, async (req, res) => {
 
 // ---------------- ME ----------------
 router.get("/me", verifyToken, async (req, res) => {
-  try {
-    const { uid, email, name } = req.firebaseUser;
-    const isDoctor = allowedDoctors.includes(email);
-
-    let user = await User.findOne({ uid });
-
-    // AUTO-CREATE USER IF MISSING
-    if (!user) {
-      user = await User.create({
-        uid,
-        email,
-        name,
-        role: isDoctor ? "doctor" : "student",
-        isApproved: isDoctor,
-      });
-    }
-
-    // Doctor auto-upgrade safety
-    if (isDoctor && user.role !== "doctor") {
-      user.role = "doctor";
-      user.isApproved = true;
-      await user.save();
-    }
-
-    res.json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch user" });
-  }
+  res.json(req.user);
 });
 
 export default router;
