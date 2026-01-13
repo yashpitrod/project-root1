@@ -48,8 +48,8 @@ const Login = () => {
         },
       });
 
-      if (res.status === 403) {
-        // User authenticated in Firebase but missing in Mongo
+      // If user not registered, auto-register
+      if (res.status === 404 || res.status === 401) {
         await fetch(`${API_BASE_URL}/api/auth/register`, {
           method: "POST",
           headers: {
@@ -60,7 +60,9 @@ const Login = () => {
         });
 
         res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
       }
 
