@@ -505,7 +505,7 @@ const StudentDashboard = () => {
                                                 ? "Available"
                                                 : "Unavailable"}
                                         </span>
-                                        <div>
+                                        <div className="queue-bar">
                                             queue: {doctorQueues[doctor._id] ?? 0}
                                         </div>
                                     </div>
