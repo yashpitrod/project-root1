@@ -302,7 +302,7 @@ const StudentDashboard = () => {
             return;
         }
 
-        let textToSend = problem;
+        let textToSend = translated ? translatedText : problem;
 
         if (!translated) {
             try {
@@ -618,7 +618,7 @@ const StudentDashboard = () => {
                             <div className="recent-request-body">
                                 <div className="request-row">
                                     <span className="label">Problem-</span>
-                                    <span className="value">{translatedText}</span>
+                                    <span className="value">{recentRequest.problem}</span>
                                 </div>
 
                                 <div className="request-row">
