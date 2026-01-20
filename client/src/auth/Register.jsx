@@ -12,6 +12,8 @@ const Register = () => {
   const navigate = useNavigate();
   //Loading state can be used to show a spinner during registration
   const [loading, setLoading] = useState(false);
+  //For success messages
+  const [success, setSuccess] = useState("");
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -71,7 +73,10 @@ const Register = () => {
         }),
       });
 
-      navigate("/login");
+      setSuccess("Account created successfully! Redirecting to login...");
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -149,6 +154,11 @@ const Register = () => {
                 </div>
               )}
 
+              {success && (
+                <div className="success-message">
+                  <span>✅</span> {success}
+                </div>
+              )}
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label className="form-label">Full Name</label>
@@ -216,8 +226,12 @@ const Register = () => {
                   </select>
                 </div>
 
-                <button className="btn btn-primary" type="submit">
-                  Create Account
+                <button
+                  className="btn btn-primary"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? "Creating account..." : "Create Account"}
                 </button>
               </form>
 
