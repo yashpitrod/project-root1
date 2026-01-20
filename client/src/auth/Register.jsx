@@ -10,6 +10,8 @@ import campusImg from "../assets/campus.png";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 const Register = () => {
   const navigate = useNavigate();
+  //Loading state can be used to show a spinner during registration
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -32,15 +34,19 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    setLoading(true);
     setError("");
 
     if (!validateEmail(formData.email)) {
       setError("Please use a valid Gmail address (@gmail.com)");
+      setLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
+      setLoading(false);
       return;
     }
 
@@ -52,7 +58,7 @@ const Register = () => {
       );
 
       // No email verification, just send user info to backend
-      const token = await userCred.user.getIdToken();
+      const token = await userCred.user.getIdToken(true);
       await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: {
@@ -68,6 +74,8 @@ const Register = () => {
       navigate("/login");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 

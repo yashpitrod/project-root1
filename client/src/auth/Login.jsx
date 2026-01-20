@@ -11,6 +11,8 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  //Loading state can be used to show a spinner during login
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   //Url to call backend API
@@ -23,59 +25,48 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    setLoading(true);
     setError('');
 
-    if (!validateEmail(email)) {
-      setError('Please use a valid Gmail address (@gmail.com)');
-      return;
-    }
-
     try {
-      // 1️⃣ Firebase login
-      const userCred = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
 
-      const token = await userCred.user.getIdToken();
+      // FORCE fresh token
+      const token = await userCred.user.getIdToken(true);
       localStorage.setItem("token", token);
 
-      // 2️⃣ Get role from backend
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 10000);
+
       let res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
       });
 
-      if (res.status === 404) {
-        throw new Error("Account not found. Please register first.");
-      }
-
-      if (res.status === 401) {
-        throw new Error("Session expired. Please login again.");
-      }
-
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || "Failed to fetch user data");
+        await fetch(`${API_BASE_URL}/api/auth/register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ role: "student" }),
+        });
+
+        res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
 
       const data = await res.json();
-
-      /* ✅ STORE USER FOR PROFILE PAGE */
       localStorage.setItem("user", JSON.stringify(data));
-      localStorage.setItem("userId", data._id);
 
-      // 3️⃣ Role-based redirect (backend decides)
-      if (data.role === "doctor") navigate("/doctor");
-      else if (data.role === "staff") navigate("/staff");
-      else if (data.role === "admin") navigate("/admin");
-      else navigate("/student");
-
+      navigate(data.role === "doctor" ? "/doctor" : "/student");
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Invalid email or password");
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -189,8 +180,12 @@ const Login = () => {
                   />
                 </div>
 
-                <button type="submit" className="btn btn-primary">
-                  Sign In
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? "Signing in..." : "Sign In"}
                 </button>
                 <div className="auth-footer" style={{ marginTop: "12px" }}>
                   <Link to="/forgot-password" className="auth-link">
