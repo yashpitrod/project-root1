@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "./navbar";
-import {
-  createUserWithEmailAndPassword,
-} from "firebase/auth";
 import { auth } from "../auth/firebase";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import campusImg from "../assets/campus.png";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -72,16 +70,9 @@ const Register = () => {
           role: formData.role,
         }),
       });
-      // 🔥 NOW FETCH USER + REDIRECT
-      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
 
-      const data = await res.json();
-      localStorage.setItem("user", JSON.stringify(data));
-      localStorage.setItem("token", token);
-
-      navigate(data.role === "doctor" ? "/doctor" : "/student");
+      // 🔥 VERY IMPORTANT: logout after register
+      await signOut(auth);
 
       setSuccess("Account created successfully! Redirecting to login...");
       setTimeout(() => {

@@ -1,7 +1,11 @@
 // src/auth/firebase.js
 
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 // (optional analytics)
 import { getAnalytics } from "firebase/analytics";
 
@@ -20,6 +24,7 @@ const app = initializeApp(firebaseConfig);
 
 // ✅ EXPORT AUTH (THIS WAS MISSING)
 export const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence);
 
 // optional
 export const analytics = getAnalytics(app);
