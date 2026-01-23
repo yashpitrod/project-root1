@@ -72,6 +72,16 @@ const Register = () => {
           role: formData.role,
         }),
       });
+      // 🔥 NOW FETCH USER + REDIRECT
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+      localStorage.setItem("user", JSON.stringify(data));
+      localStorage.setItem("token", token);
+
+      navigate(data.role === "doctor" ? "/doctor" : "/student");
 
       setSuccess("Account created successfully! Redirecting to login...");
       setTimeout(() => {
