@@ -24,34 +24,23 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (loading) return;
-    setLoading(true);
-    setError('');
+  e.preventDefault();
+  if (loading) return;
 
-    try {
-      const userCred = await signInWithEmailAndPassword(auth, email, password);
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(), 10000);
+  setLoading(true);
+  setError("");
 
-      let res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        throw new Error("Failed to fetch user profile");
-      }
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
 
-      const data = await res.json();
-      localStorage.setItem("user", JSON.stringify(data));
+    navigate("/student", { replace: true });
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
-      navigate(data.role === "doctor" ? "/doctor" : "/student");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <>

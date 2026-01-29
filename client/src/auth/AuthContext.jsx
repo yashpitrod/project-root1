@@ -11,11 +11,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const token = await firebaseUser.getIdToken();
-        localStorage.setItem("token", token);
         setUser(firebaseUser);
       } else {
-        localStorage.removeItem("token");
         setUser(null);
       }
       setLoading(false);
@@ -24,8 +21,13 @@ export const AuthProvider = ({ children }) => {
     return () => unsub();
   }, []);
 
+  const getToken = async () => {
+    if (!auth.currentUser) return null;
+    return await auth.currentUser.getIdToken(true);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, getToken }}>
       {children}
     </AuthContext.Provider>
   );

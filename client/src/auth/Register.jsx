@@ -72,7 +72,6 @@ const Register = () => {
       });
 
       setSuccess("Account created successfully! Redirecting to login...");
-      await auth.signOut();
       navigate("/login", { replace: true });
     } catch (err) {
       setError(err.message);
