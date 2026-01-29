@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
 
   const getToken = async () => {
     if (!auth.currentUser) return null;
-    return await auth.currentUser.getIdToken(true);
+    return await auth.currentUser.getIdToken(); 
   };
 
   return (

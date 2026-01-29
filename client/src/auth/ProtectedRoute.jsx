@@ -5,36 +5,45 @@ import { useEffect, useState } from "react";
 const ProtectedRoute = ({ children }) => {
   const { user, loading, getToken } = useAuth();
   const location = useLocation();
-  const [verified, setVerified] = useState(false);
+  const [status, setStatus] = useState("checking"); 
+  // checking | verified | rejected
 
   useEffect(() => {
     const verify = async () => {
-      if (!user) return;
+      if (!user) {
+        setStatus("rejected");
+        return;
+      }
 
-      const token = await getToken();
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
 
-      if (res.ok) {
-        setVerified(true);
+        if (!res.ok) {
+          setStatus("rejected");
+          return;
+        }
+
+        setStatus("verified");
+      } catch (err) {
+        setStatus("rejected");
       }
     };
 
     verify();
   }, [user]);
 
-  if (loading) {
+  if (loading || status === "checking") {
     return <div style={{ textAlign: "center", marginTop: "20vh" }}>Loading...</div>;
   }
 
-  if (!user) {
+  if (!user || status === "rejected") {
     return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
-  if (!verified) {
-    return <div style={{ textAlign: "center", marginTop: "20vh" }}>Verifying...</div>;
   }
 
   return children;

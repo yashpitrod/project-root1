@@ -15,7 +15,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  //Url to call backend API
+  //Url to call backend API 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
   const validateEmail = (email) => {
@@ -31,11 +31,35 @@ const Login = () => {
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // 1️⃣ Firebase login
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
 
-      setTimeout(() => {
+      // 2️⃣ Get ID token (NO force refresh)
+      const token = await userCred.user.getIdToken();
+
+      // 3️⃣ Ask backend who this user is
+      const res = await fetch(
+        `${API_BASE_URL}/api/auth/me`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to verify user");
+      }
+
+      const data = await res.json();
+
+      // 4️⃣ Route by role
+      if (data.role === "doctor") {
+        navigate("/doctor", { replace: true });
+      } else {
         navigate("/student", { replace: true });
-      }, 300);
+      }
+
     } catch (err) {
       setError(err.message);
     } finally {

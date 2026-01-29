@@ -82,9 +82,7 @@ router.get("/me", verifyToken, async (req, res) => {
     let user = await User.findOne({ uid });
 
     if (!user) {
-      return res.status(404).json({
-        message: "User not registered"
-      });
+      return res.status(403).json({ message: "User exists in Firebase but not DB" });
     }
 
     // Doctor auto-upgrade safety

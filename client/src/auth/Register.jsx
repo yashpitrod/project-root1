@@ -58,7 +58,7 @@ const Register = () => {
       );
 
       // No email verification, just send user info to backend
-      const token = await userCred.user.getIdToken(true);
+      const token = await userCred.user.getIdToken();
       await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: {
