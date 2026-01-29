@@ -71,13 +71,9 @@ const Register = () => {
         }),
       });
 
-      // 🔥 VERY IMPORTANT: logout after register
-      await signOut(auth);
-
       setSuccess("Account created successfully! Redirecting to login...");
-      setTimeout(() => {
-        navigate("/login");
-      }, 1500);
+      await auth.signOut();
+      navigate("/login", { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {

@@ -31,11 +31,6 @@ const Login = () => {
 
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-
-      // FORCE fresh token
-      const token = await userCred.user.getIdToken(true);
-      localStorage.setItem("token", token);
-
       const controller = new AbortController();
       setTimeout(() => controller.abort(), 10000);
 
@@ -43,20 +38,8 @@ const Login = () => {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
-
       if (!res.ok) {
-        await fetch(`${API_BASE_URL}/api/auth/register`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ role: "student" }),
-        });
-
-        res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        throw new Error("Failed to fetch user profile");
       }
 
       const data = await res.json();
