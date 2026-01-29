@@ -72,7 +72,12 @@ const Register = () => {
       });
 
       setSuccess("Account created successfully! Redirecting to login...");
-      navigate("/login", { replace: true });
+      await auth.signOut();
+
+      // ⏳ allow UI to render + Firebase to settle
+      setTimeout(() => {
+        navigate("/login", { replace: true });
+      }, 1200);
     } catch (err) {
       setError(err.message);
     } finally {
