@@ -256,7 +256,7 @@ const StudentDashboard = () => {
             socket.off("request-status-updated");
             socket.disconnect();
         };
-    }, [userId, token]);
+    }, [token]);
 
     // -------------------- EVENT HANDLERS --------------------
     const handleLogout = () => {
