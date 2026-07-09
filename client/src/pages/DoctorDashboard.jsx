@@ -5,10 +5,45 @@ import { signOut } from "firebase/auth";
 import { auth } from "../auth/firebase";
 import { useNavigate } from "react-router-dom";
 
+const useCounter = (value, duration = 800) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const increment = value / (duration / 16);
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= value) {
+        setCount(value);
+        clearInterval(timer);
+      } else {
+        setCount(Math.ceil(start));
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [value, duration]);
+
+  return count;
+};
+
 const DoctorDashboard = () => {
   const socketRef = useRef(null);
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+
+  // H-02: Helper to always get a fresh (non-expired) Firebase ID token.
+  // Firebase tokens expire after 60 min; getIdToken() refreshes automatically.
+  const getFreshToken = async () => {
+    if (auth.currentUser) {
+      const fresh = await auth.currentUser.getIdToken();
+      localStorage.setItem("token", fresh); // keep localStorage in sync for socket
+      return fresh;
+    }
+    return localStorage.getItem("token");
+  };
+
+  const token = localStorage.getItem("token"); // used only for initial socket auth
 
   const [doctor, setDoctor] = useState(null);
   const [appointments, setAppointments] = useState([]);
@@ -23,6 +58,10 @@ const DoctorDashboard = () => {
     autoConfirm: false,
   });
 
+  const toggleSetting = (key) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -33,42 +72,24 @@ const DoctorDashboard = () => {
     }
   };
 
-  /* INIT SOCKET */
+  /* INIT SOCKET & LISTENERS */
   useEffect(() => {
-    socketRef.current = io(`${API_BASE_URL}`);
+    // SK-01: Pass auth token so the server's socket auth middleware accepts the connection
+    socketRef.current = io(`${API_BASE_URL}`, {
+      auth: { token },
+    });
 
-    return () => {
-      socketRef.current.disconnect();
-    };
-  }, []);
+    // AU-05: Server now auto-joins the user's room on connection.
+    // No need to emit "join-room" — the server uses the verified MongoDB ID.
 
-  /* LOAD DOCTOR */
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      setDoctor(user);
-      setAvailability(user.availability || "available");
-    }
-  }, []);
+    const socket = socketRef.current;
 
-  /* JOIN ROOM */
-  useEffect(() => {
-    if (!doctor?._id) return;
-
-    socketRef.current.emit("join-room", doctor._id);
-    console.log("Doctor joined room:", doctor._id);
-  }, [doctor]);
-
-  /* RECEIVE NEW REQUEST */
-  useEffect(() => {
-    if (!socketRef.current) return;
-
-    socketRef.current.on("new-request", async () => {
+    socket.on("new-request", async () => {
       try {
+        const freshToken = await getFreshToken();
         const res = await fetch(`${API_BASE_URL}/api/requests/doctor`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${freshToken}`,
           },
         });
         const data = await res.json();
@@ -81,38 +102,56 @@ const DoctorDashboard = () => {
     });
 
     return () => {
-      socketRef.current?.off("new-request");
+      socket.off("new-request");
+      socket.disconnect();
     };
-  }, []);
+  }, [token]);
 
+  /* LOAD DOCTOR */
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      let user = null;
+      try {
+        user = JSON.parse(storedUser); // M-01: guard against corrupt localStorage
+      } catch (e) {
+        console.error("Failed to parse user from localStorage", e);
+      }
+      if (user) {
+        setDoctor(user);
+        setAvailability(user.availability || "available");
+      }
+    }
+  }, []);
 
   /* FETCH APPOINTMENTS */
   useEffect(() => {
     if (!token) return;
 
-    fetch(`${API_BASE_URL}/api/requests/doctor`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setAppointments(data.requests);
-        }
-      });
+    (async () => {
+      const freshToken = await getFreshToken();
+      fetch(`${API_BASE_URL}/api/requests/doctor`, {
+        headers: { Authorization: `Bearer ${freshToken}` },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) setAppointments(data.requests);
+        })
+        .catch(err => console.error("Failed to load appointments:", err));
+    })();
   }, [token]);
 
   /* UPDATE STATUS */
   const updateStatus = async (id, status) => {
     try {
+      const freshToken = await getFreshToken();
       const res = await fetch(
         `${API_BASE_URL}/api/requests/${id}/status`,
         {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${freshToken}`,
           },
           body: JSON.stringify({ status }),
         }
@@ -147,13 +186,12 @@ const DoctorDashboard = () => {
     if (!confirmDelete) return;
 
     try {
+      const freshToken = await getFreshToken();
       const res = await fetch(
         `${API_BASE_URL}/api/requests/${id}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${freshToken}` },
         }
       );
 
@@ -169,19 +207,28 @@ const DoctorDashboard = () => {
 
   /* AVAILABILITY */
   const toggleAvailability = async () => {
-    const newStatus = availability === "available" ? "busy" : "available";
+    try {
+      const newStatus = availability === "available" ? "busy" : "available";
+      const freshToken = await getFreshToken();
+      const res = await fetch(`${API_BASE_URL}/api/doctors/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${freshToken}`,
+        },
+        body: JSON.stringify({ availability: newStatus }),
+      });
 
-    const res = await fetch(`${API_BASE_URL}/api/doctors/status`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ availability: newStatus }),
-    });
+      if (!res.ok) {
+        throw new Error("Failed to update status");
+      }
 
-    const data = await res.json();
-    setAvailability(data.availability);
+      const data = await res.json();
+      setAvailability(data.availability);
+    } catch (error) {
+      console.error("Availability toggle error:", error);
+      alert("Failed to change availability. Please try again.");
+    }
   };
 
   const pendingCount = appointments.filter(a => a.status === "pending").length;
@@ -193,28 +240,6 @@ const DoctorDashboard = () => {
     year: "numeric",
   });
 
-  const useCounter = (value, duration = 800) => {
-    const [count, setCount] = useState(0);
-
-    useEffect(() => {
-      let start = 0;
-      const increment = value / (duration / 16);
-
-      const timer = setInterval(() => {
-        start += increment;
-        if (start >= value) {
-          setCount(value);
-          clearInterval(timer);
-        } else {
-          setCount(Math.ceil(start));
-        }
-      }, 16);
-
-      return () => clearInterval(timer);
-    }, [value]);
-
-    return count;
-  };
   const animatedTotal = useCounter(appointments.length);
   const animatedPending = useCounter(pendingCount);
   const animatedApproved = useCounter(approvedCount);
@@ -238,7 +263,7 @@ const DoctorDashboard = () => {
             {doctor?.name?.split(" ").map(n => n[0]).join("")}
           </div>
           <h3 className="doctor-name">{doctor?.name || "Doctor Name"}</h3>
-          <p className="specialty">Senior Cardiologist</p>
+          <p className="specialty">Campus Doctor</p>
 
           <div
             className={`status-badge ${availability === "available" ? "online" : "offline"}`}

@@ -1,24 +1,38 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { auth } from "../auth/firebase";
 import "../styles/RequestHistory.css";
 
 const RequestHistory = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
 
   //Url to call backend API
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
+  const getFreshToken = async () => {
+    if (auth.currentUser) {
+      const fresh = await auth.currentUser.getIdToken();
+      localStorage.setItem("token", fresh);
+      return fresh;
+    }
+    return localStorage.getItem("token");
+  };
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {
+        const freshToken = await getFreshToken();
         const res = await fetch(`${API_BASE_URL}/api/requests/my`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${freshToken}` },
         });
+
+        // M-02: Check res.ok before parsing JSON to catch 401/500 errors
+        if (!res.ok) {
+          console.error("Failed to fetch request history, status:", res.status);
+          return;
+        }
 
         const data = await res.json();
         if (data.success) {

@@ -50,8 +50,9 @@ const Register = () => {
       return;
     }
 
+    let userCred = null;
     try {
-      const userCred = await createUserWithEmailAndPassword(
+      userCred = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
@@ -59,7 +60,7 @@ const Register = () => {
 
       // No email verification, just send user info to backend
       const token = await userCred.user.getIdToken();
-      await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -71,6 +72,11 @@ const Register = () => {
         }),
       });
 
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Registration failed on server");
+      }
+
       setSuccess("Account created successfully! Redirecting to login...");
 
       // ⏳ allow UI to render + Firebase to settle
@@ -78,6 +84,11 @@ const Register = () => {
         navigate("/login", { replace: true });
       }, 1200);
     } catch (err) {
+      // H-01: Rollback — if the backend failed, delete the orphaned Firebase account
+      // so the user can retry registration cleanly without being locked out.
+      if (userCred?.user) {
+        await userCred.user.delete().catch(() => {});
+      }
       setError(err.message);
     } finally {
       setLoading(false);
@@ -222,7 +233,6 @@ const Register = () => {
                   >
                     <option value="student">Student</option>
                     <option value="staff">Staff</option>
-                    <option value="admin">Admin</option>
                   </select>
                 </div>
 

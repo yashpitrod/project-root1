@@ -53,6 +53,11 @@ const Login = () => {
 
       const data = await res.json();
 
+      // H-03: Persist token + user so dashboards can read them from localStorage.
+      // Token is also kept fresh via AuthContext.getToken() for API calls.
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(data));
+
       // 4️⃣ Route by role
       if (data.role === "doctor") {
         navigate("/doctor", { replace: true });
@@ -158,7 +163,7 @@ const Login = () => {
                     autoComplete="email"
                   />
                   <span className="form-hint">
-                    Only Gmail accounts are supported
+                    Only Gmail accounts are supported (including institutional G Suite)
                   </span>
                 </div>
 

@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { auth } from './firebase'; // Import auth directly
+
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -9,7 +9,7 @@ const ProtectedRoute = ({ children }) => {
     return <div className="loading-spinner">Loading...</div>; 
   }
 
-  if (!user && !auth.currentUser) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 

@@ -93,9 +93,9 @@ The platform improves **transparency, efficiency, and accessibility** in campus 
 
 ### 👨‍⚕️ Doctor Login (Prototype Only)
 
-> ⚠️ **For demo/testing purposes only**
-Email: sameer.patnaik@gmail.com
-Password: yash@1029
+> ⚠️ **For demo/testing purposes only**  
+> Doctor demo credentials are provided privately to authorized reviewers.  
+> Contact the team lead for access.
 
 Only **pre-approved institutional doctor emails** are allowed to access the doctor dashboard.
 

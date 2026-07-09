@@ -285,6 +285,17 @@
   border: 3px solid #e5e7eb;
 }
 
+.avatar-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  color: white;
+  font-size: 28px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .doctor-card.selected .doctor-image {
   border-color: #22c55e;
 }

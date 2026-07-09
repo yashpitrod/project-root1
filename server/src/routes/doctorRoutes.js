@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import verifyToken from "../middlewares/verifyToken.js";
 import User from "../models/User.js";
 import Request from "../models/Request.js";
@@ -10,6 +11,10 @@ const router = express.Router();
 router.get("/:doctorId/queue", verifyToken, async (req, res) => {
   try {
     const { doctorId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+      return res.status(400).json({ message: "Invalid doctor ID" });
+    }
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
@@ -34,7 +39,7 @@ router.put("/status", verifyToken, async (req, res) => {
     const doctorId = req.user._id; // ✅ MongoDB _id
     const { availability } = req.body;
 
-    if (!["available", "busy"].includes(availability)) {
+    if (!["available", "busy", "emergency"].includes(availability)) {
       return res.status(400).json({ message: "Invalid availability" });
     }
 
@@ -54,10 +59,12 @@ router.put("/status", verifyToken, async (req, res) => {
 
     /* 🔴 SOCKET BROADCAST TO STUDENTS */
     const io = req.app.get("io");
-    io.emit("doctor-status-updated", {
-      doctorId: doctor._id.toString(),
-      availability: doctor.availability,
-    });
+    if (io) {
+      io.emit("doctor-status-updated", {
+        doctorId: doctor._id.toString(),
+        availability: doctor.availability,
+      });
+    }
 
     res.json({
       success: true,
@@ -72,7 +79,8 @@ router.put("/status", verifyToken, async (req, res) => {
 /* =========================================
    GET ALL DOCTORS (STUDENT SIDE)
 ========================================= */
-router.get("/", async (req, res) => {
+// RT-01: Added verifyToken — doctor list should not be publicly accessible
+router.get("/", verifyToken, async (req, res) => {
   try {
     const doctors = await User.find(
       {

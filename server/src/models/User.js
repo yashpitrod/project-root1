@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema(
     // Doctor-only fields
     isApproved: {
       type: Boolean,
-      default: true
+      default: false // DB-05: Default to false for safety
     },
 
     availability: {

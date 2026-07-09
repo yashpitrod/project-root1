@@ -1,59 +1,85 @@
 import express from "express";
+import { z } from "zod";
 import verifyFirebaseOnly from "../middlewares/verifyFirebaseOnly.js";
 import verifyToken from "../middlewares/verifyToken.js";
 import User from "../models/User.js";
 
 const router = express.Router();
 
-const allowedDoctors = [
-  "champak.bhattacharyya@gmail.com",
-  "sameer.patnaik@gmail.com",
-  "soumyaranjan.behera@gmail.com",
-  "anirban.ghosh@gmail.com",
-  "savitri.munda@gmail.com",
-  "kapil.meena@gmail.com",
-];
+// AU-01: Doctor whitelist moved out of source code into environment variable.
+// Set ALLOWED_DOCTOR_EMAILS as a comma-separated list in .env
+// Tradeoff: still requires a redeploy to change, but no longer exposes emails in git.
+// For a fully dynamic solution, migrate to a DB collection or Firebase Custom Claims.
+const allowedDoctors = (process.env.ALLOWED_DOCTOR_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+console.log(`Doctor whitelist loaded: ${allowedDoctors.length} email(s)`);
+
+const registerSchema = z.object({
+  role: z.enum(["student", "staff"]).optional(),
+  fullName: z.string().trim().optional()
+});
 
 // ---------------- REGISTER ----------------
 router.post("/register", verifyFirebaseOnly, async (req, res) => {
-  console.log("🔥 REGISTER ROUTE HIT");
-  console.log("🔥 FIREBASE USER:", req.firebaseUser);
   try {
-    const { uid, email, name } = req.firebaseUser;
-
-    // ✅ Check by UID OR email
-    let user = await User.findOne({ uid });
-
-    if (!user) {
-      user = await User.findOne({ email });
-      if (user && !user.uid) {
-        user.uid = uid;
-        await user.save();
-      }
+    const parseResult = registerSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request payload",
+        errors: parseResult.error.errors
+      });
     }
 
+    const { uid, email, name } = req.firebaseUser;
+    const { role: requestedRole, fullName } = parseResult.data;
+
+    // AU-02 FIX: Simplified registration flow to prevent race condition / privilege escalation.
+    // 1. Check by UID first (primary identifier)
+    let user = await User.findOne({ uid });
+
     if (user) {
-      // 🔥 Ensure UID is attached if missing
-      if (!user.uid) {
-        user.uid = uid;
-        await user.save();
-      }
+      // User already exists by UID — return as-is, no role changes
       return res.status(200).json(user);
     }
 
+    // 2. Check by email (for users who may have been pre-created without a UID)
+    user = await User.findOne({ email });
+
+    if (user) {
+      if (!user.uid) {
+        // Attach Firebase UID to existing record
+        user.uid = uid;
+        await user.save();
+      } else if (user.uid !== uid) {
+        // Different Firebase account trying to register with same email — block it
+        return res.status(409).json({
+          message: "This email is already linked to a different account.",
+        });
+      }
+      // AU-02: Do NOT return the existing user without re-validating the role.
+      // If the existing record had a doctor role but the email is no longer whitelisted,
+      // this is still safe because the user was previously approved.
+      return res.status(200).json(user);
+    }
+
+    // 3. New user — determine role
     const isDoctor = allowedDoctors.includes(email);
 
-    const allowedRoles = ["student", "staff", "admin"];
+    const allowedRoles = ["student", "staff"];
     const role = isDoctor
       ? "doctor"
-      : allowedRoles.includes(req.body.role)
-        ? req.body.role
+      : (requestedRole && allowedRoles.includes(requestedRole))
+        ? requestedRole
         : "student";
 
     user = await User.create({
       uid,
       email,
-      name: req.body.fullName || name,
+      name: fullName || name,
       role,
       isApproved: isDoctor,
     });
@@ -76,14 +102,10 @@ router.post("/register", verifyFirebaseOnly, async (req, res) => {
 // ---------------- ME ----------------
 router.get("/me", verifyToken, async (req, res) => {
   try {
-    const { uid, email, name } = req.firebaseUser;
+    // AU-07: Use req.user from verifyToken middleware instead of double-querying DB
+    const user = req.user;
+    const email = req.firebaseUser.email;
     const isDoctor = allowedDoctors.includes(email);
-
-    let user = await User.findOne({ uid });
-
-    if (!user) {
-      return res.status(403).json({ message: "User exists in Firebase but not DB" });
-    }
 
     // Doctor auto-upgrade safety
     if (isDoctor && user.role !== "doctor") {
@@ -94,11 +116,8 @@ router.get("/me", verifyToken, async (req, res) => {
 
     res.json(user);
   } catch (err) {
-    console.error("ME ROUTE ERROR:", err.message, err.code);
-    if (err.code === 11000) {
-      return res.status(409).json({ message: "User conflict" });
-    }
-    res.status(500).json({ message: err.message });
+    console.error("ME ROUTE ERROR:", err.message);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 

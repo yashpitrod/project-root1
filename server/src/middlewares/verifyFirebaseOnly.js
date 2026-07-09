@@ -13,8 +13,7 @@ const verifyFirebaseOnly = async (req, res, next) => {
 
     const decoded = await admin.auth().verifyIdToken(token);
 
-    console.log("✅ FIREBASE TOKEN VERIFIED:", decoded.email);
-
+    // AU-06: Use decoded.uid internally
     req.firebaseUser = {
       uid: decoded.uid,
       email: decoded.email.toLowerCase(),

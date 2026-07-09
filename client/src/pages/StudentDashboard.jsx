@@ -3,17 +3,11 @@
 //     >Receive real-time updates on request status via WebSocket.
 //     >View recent requests and health records.
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 import { io } from "socket.io-client";
+import { auth } from "../auth/firebase";
 import '../styles/studentdash.css';
-import doctorChampak from '../assets/doctor-champa.jpg';
-import doctorSameer from '../assets/doctor-sameer.jpg';
-import doctorSoumya from '../assets/doctor-soumya.jpg';
-import doctorAnirban from '../assets/blank-profile-picture.jpg';
-import doctorSavitri from '../assets/blank-profile-picture.jpg';
-import doctorKapil from '../assets/blank-profile-picture.jpg';
 
 //Url to call backend API
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -38,10 +32,24 @@ const StudentDashboard = () => {
     // Navigation hook
     const navigate = useNavigate();
 
-    // Get user info from localStorage
+    // Get user info from localStorage (set at login; token refreshed before each API call)
     const token = localStorage.getItem("token");
-    const userId = localStorage.getItem("userId");
-    const user = JSON.parse(localStorage.getItem("user"));
+    let user = null;
+    try {
+        user = JSON.parse(localStorage.getItem("user"));
+    } catch (e) {
+        console.error("Failed to parse user from localStorage", e);
+    }
+
+    // H-02: Helper to always get a fresh (non-expired) Firebase ID token.
+    const getFreshToken = async () => {
+        if (auth.currentUser) {
+            const fresh = await auth.currentUser.getIdToken();
+            localStorage.setItem("token", fresh);
+            return fresh;
+        }
+        return localStorage.getItem("token");
+    };
 
     // 
     const totalDoctors = doctors.length;
@@ -54,9 +62,7 @@ const StudentDashboard = () => {
     );
 
     // Helper object for dispensary status
-    const dispensaryStatus = {
-        inQueue: 5,
-    };
+    const dispensaryStatus = {};
 
     //Helper functions for fetching date and time
     const formatDate = (date) => {
@@ -108,8 +114,8 @@ const StudentDashboard = () => {
         }
         return slots;
     };
-    // Generate time slots
-    const timeSlots = generateTimeSlots();
+    // N-01: generateTimeSlots is pure — memoize to avoid recomputing every render
+    const timeSlots = useMemo(() => generateTimeSlots(), []);
 
     //useeffet for => fetching requests
     //                computing last visit
@@ -118,10 +124,9 @@ const StudentDashboard = () => {
     useEffect(() => {
         const fetchLatestRequest = async () => {
             try {
+                const freshToken = await getFreshToken();
                 const res = await fetch(`${API_BASE_URL}/api/requests/my`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
+                    headers: { Authorization: `Bearer ${freshToken}` },
                 });
 
                 const data = await res.json();
@@ -157,28 +162,28 @@ const StudentDashboard = () => {
         if (token) fetchLatestRequest();
     }, [token]);
 
-    //2. for auth check
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        if (!token) {
-            navigate("/login");
-        }
-    }, [navigate]);
+
 
     //3. for fetching doctors list
     useEffect(() => {
-        fetch(`${API_BASE_URL}/api/doctors`)
-            .then(res => res.json())
-            .then(data => setDoctors(data))
-            .catch(err => console.error("Failed to load doctors", err));
-    }, []);
+        (async () => {
+            const freshToken = await getFreshToken();
+            fetch(`${API_BASE_URL}/api/doctors`, {
+                headers: { Authorization: `Bearer ${freshToken}` }
+            })
+                .then(res => res.json())
+                .then(data => setDoctors(data))
+                .catch(err => console.error("Failed to load doctors", err));
+        })();
+    }, [token]);
 
     // Fetch doctor queues whenever doctors list changes
     useEffect(() => {
         if (!doctors.length) return;
 
         const fetchQueues = async () => {
-            const token = localStorage.getItem("token");
+            // M-03: Removed duplicate localStorage.getItem("token") — use getFreshToken() instead
+            const freshToken = await getFreshToken();
             const queueMap = {};
 
             await Promise.all(
@@ -186,11 +191,7 @@ const StudentDashboard = () => {
                     try {
                         const res = await fetch(
                             `${API_BASE_URL}/api/doctors/${doctor._id}/queue`,
-                            {
-                                headers: {
-                                    Authorization: `Bearer ${token}`,
-                                },
-                            }
+                            { headers: { Authorization: `Bearer ${freshToken}` } }
                         );
                         const data = await res.json();
                         queueMap[doctor._id] = data.queue ?? 0;
@@ -213,13 +214,13 @@ const StudentDashboard = () => {
             return;
         }
 
-        const socket = io(API_BASE_URL);
+        // SK-01: Pass auth token so the server's socket auth middleware accepts the connection
+        const socket = io(API_BASE_URL, {
+            auth: { token },
+        });
 
-        // Join socket room when userId is available
-        if (userId) {
-            socket.emit("join-room", userId);
-            console.log("🟢 Student joined socket room:", userId);
-        }
+        // AU-05: Server now auto-joins the user's room on connection.
+        // No need to emit "join-room" — the server uses the verified MongoDB ID.
 
         // Listen to doctor status updates
         socket.on("doctor-status-updated", ({ doctorId, availability }) => {
@@ -234,7 +235,6 @@ const StudentDashboard = () => {
 
         // Listen to request status updates
         socket.on("request-status-updated", ({ requestId, status }) => {
-            console.log("📡 Student received status update:", requestId, status);
 
             setRecentRequest(prev => {
                 if (!prev || prev._id !== requestId) return prev;
@@ -256,7 +256,7 @@ const StudentDashboard = () => {
             socket.off("request-status-updated");
             socket.disconnect();
         };
-    }, [userId]);
+    }, [userId, token]);
 
     // -------------------- EVENT HANDLERS --------------------
     const handleLogout = () => {
@@ -271,11 +271,12 @@ const StudentDashboard = () => {
         if (!problem.trim()) return;
 
         try {
+            const freshToken = await getFreshToken();
             const res = await fetch(`${API_BASE_URL}/api/translate`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
+                    Authorization: `Bearer ${freshToken}`,
                 },
                 body: JSON.stringify({ text: problem }),
             });
@@ -295,77 +296,88 @@ const StudentDashboard = () => {
     };
 
     const handleSubmit = async () => {
-        if (selectedDoctor === user._id) {
+        if (selectedDoctor === user?._id) {
             alert("You cannot book appointment with yourself");
             return;
         }
 
-        let textToSend = translated ? translatedText : problem;
+        try {
+            let textToSend = translated ? translatedText : problem;
 
-        if (!translated) {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/translate`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ text: problem }),
-                });
+            if (!translated) {
+                try {
+                    const freshToken = await getFreshToken();
+                    const res = await fetch(`${API_BASE_URL}/api/translate`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${freshToken}`,
+                        },
+                        body: JSON.stringify({ text: problem }),
+                    });
 
-                const data = await res.json();
-                if (data.success) {
-                    textToSend = data.translatedText;
-                    setTranslatedText(data.translatedText);
-                    setTranslated(true);
+                    const data = await res.json();
+                    if (data.success) {
+                        textToSend = data.translatedText;
+                        setTranslatedText(data.translatedText);
+                        setTranslated(true);
+                    }
+                } catch (err) {
+                    console.error("Auto-translate failed");
                 }
-            } catch (err) {
-                console.error("Auto-translate failed");
             }
-        }
-        const res = await fetch(`${API_BASE_URL}/api/requests`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-                problem: textToSend,
-                alreadyTranslated: true,
+            const freshToken = await getFreshToken();
+            const res = await fetch(`${API_BASE_URL}/api/requests`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${freshToken}`,
+                },
+                body: JSON.stringify({
+                    problem: textToSend,
+                    alreadyTranslated: true,
+                    doctorId: selectedDoctor,
+                    timeSlot: selectedTimeSlot,
+                }),
+            });
+
+            if (!res.ok) {
+                throw new Error("Failed to book appointment");
+            }
+
+            const data = await res.json();
+            const doctorObj = doctors.find(d => d._id === selectedDoctor);
+
+            const newRequest = {
+                _id: data.request._id,
+                problem: data.request.problem,              // English 
+                originalProblem: data.request.originalProblem,
                 doctorId: selectedDoctor,
+                doctorName: doctorObj?.name || "Doctor",
                 timeSlot: selectedTimeSlot,
-            }),
-        });
+                status: "pending",
+                createdAt: new Date().toISOString(),
+            };
 
-        const data = await res.json();
-        const doctorObj = doctors.find(d => d._id === selectedDoctor);
+            // for updating state and localStorage
+            setRecentRequest(newRequest);
+            setAppointmentStatus("pending");
+            setShowAppointmentBanner(true);
 
-        const newRequest = {
-            _id: data.request._id,
-            problem: data.request.problem,              // English 
-            originalProblem: data.request.originalProblem,
-            doctorId: selectedDoctor,
-            doctorName: doctorObj?.name || "Doctor",
-            timeSlot: selectedTimeSlot,
-            status: "pending",
-            createdAt: new Date().toISOString(),
-        };
+            localStorage.setItem("recentRequest", JSON.stringify(newRequest));
+            // reset form
+            setProblem("");
+            setTranslated(false);
+            setTranslatedText("");
+            setSelectedDoctor(null);
+            setSelectedTimeSlot("");
 
-        // for updating state and localStorage
-        setRecentRequest(newRequest);
-        setAppointmentStatus("pending");
-        setShowAppointmentBanner(true);
-
-        localStorage.setItem("recentRequest", JSON.stringify(newRequest));
-        // reset form
-        setProblem("");
-        setTranslated(false);
-        setTranslatedText("");
-        setSelectedDoctor(null);
-        setSelectedTimeSlot("");
-
-        // Show appointment banner
-        setShowAppointmentBanner(true);
+            // Show appointment banner
+            setShowAppointmentBanner(true);
+        } catch (error) {
+            console.error("Submission error:", error);
+            alert("Failed to submit request. Please try again.");
+        }
     };
 
 
@@ -477,18 +489,8 @@ const StudentDashboard = () => {
                                         }}
                                     >
 
-                                        <div className="doctor-image">
-                                            <img
-                                                src={
-                                                    doctor.email.includes("champak") ? doctorChampak :
-                                                        doctor.email.includes("sameer") ? doctorSameer :
-                                                            doctor.email.includes("soumyaranjan") ? doctorSoumya :
-                                                                doctor.email.includes("anirban") ? doctorAnirban :
-                                                                    doctor.email.includes("savitri") ? doctorSavitri :
-                                                                        doctorKapil
-                                                }
-                                                alt={doctor.name}
-                                            />
+                                        <div className="doctor-image avatar-initials">
+                                            {doctor.name?.split(" ").map(n => n[0]).join("")}
                                         </div>
 
                                         <h4>{doctor.name}</h4>

@@ -24,9 +24,19 @@ const app = initializeApp(firebaseConfig);
 
 // ✅ EXPORT AUTH (THIS WAS MISSING)
 export const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence);
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.warn("Auth persistence could not be set:", err);
+});
 
 // optional
-export const analytics = getAnalytics(app);
+let analytics = null;
+try {
+  if (typeof window !== "undefined" && import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) {
+    analytics = getAnalytics(app);
+  }
+} catch (e) {
+  console.warn("Analytics could not be initialized:", e);
+}
+export { analytics };
 
 export default app;
