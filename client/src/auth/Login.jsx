@@ -203,9 +203,17 @@ const Login = () => {
                   className="btn"
                   onClick={handleGoogleSignIn}
                   disabled={loading}
-                  style={{ marginTop: "12px", background: "#fff", color: "#111827", border: "1px solid #d1d5db" }}
+                  style={{ marginTop: "12px", background: "#fff", color: "#111827", border: "1px solid #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
                 >
-                  {loading ? "Working..." : "Continue with Google"}
+                  <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path fill="#4285F4" d="M21.6 12.23c0-.78-.07-1.53-.2-2.25H12v4.26h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.98-4.33 2.98-7.53Z" />
+                      <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.44l-3.24-2.5c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.58A10 10 0 0 0 12 22Z" />
+                      <path fill="#FBBC05" d="M6.41 13.9a6.02 6.02 0 0 1 0-3.8V7.52H3.07a10 10 0 0 0 0 8.76l3.34-2.38Z" />
+                      <path fill="#EA4335" d="M12 6.04c1.47 0 2.79.5 3.83 1.49l2.87-2.87A9.96 9.96 0 0 0 12 2a10 10 0 0 0-8.93 5.52l3.34 2.58C7.2 7.8 9.4 6.04 12 6.04Z" />
+                    </svg>
+                  </span>
+                  <span>{loading ? "Working..." : "Continue with Google"}</span>
                 </button>
                 <div className="auth-footer" style={{ marginTop: "12px" }}>
                   <Link to="/forgot-password" className="auth-link">
