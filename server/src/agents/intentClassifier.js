@@ -2,7 +2,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 // Initialize Gemini flash for fast intent classification
 const llm = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.1",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
   temperature: 0,
@@ -31,12 +31,12 @@ Classification:`;
   try {
     const response = await llm.invoke(prompt);
     const result = response.content.trim().toLowerCase();
-    
+
     if (result.includes("triage")) return "triage";
     if (result.includes("faq")) return "faq";
-    
+
     // Fallback if the model returns something weird
-    return "triage"; 
+    return "triage";
   } catch (error) {
     console.error("[IntentClassifier] Error:", error.message);
     // Safe fallback to triage if API fails

@@ -29,7 +29,7 @@ const CAMPUS_KB_DIR = path.resolve(__dirname, "../knowledge-base/campus");
 const geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // ── Embedding model ────────────────────────────────────────────────────────
-const EMBEDDING_MODEL = "gemini-embedding-001";
+const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-1.0";
 
 // ── In-memory stores ────────────────────────────────────────────────────────
 /**
@@ -78,13 +78,14 @@ async function embedBatch(texts, delayMs = 1500) {
         success = true;
       } catch (err) {
         attempts++;
+        const retryDelayMs = getRetryDelayMs(err) || 5000 * attempts;
         if (attempts >= 4) {
           console.error(`Embedding failed for chunk ${i} after 4 attempts: ${err.message}`);
           // Push null — filtered out during indexing
           embeddings.push(null);
         } else {
-          console.warn(`Embedding failed for chunk ${i} (attempt ${attempts}). Retrying in 5s...`);
-          await sleep(5000);
+          console.warn(`Embedding failed for chunk ${i} (attempt ${attempts}). Retrying in ${Math.round(retryDelayMs / 1000)}s...`);
+          await sleep(retryDelayMs);
         }
       }
     }
@@ -94,6 +95,19 @@ async function embedBatch(texts, delayMs = 1500) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getRetryDelayMs(error) {
+  if (!error || !error.details) return null;
+  const retryInfo = error.details.find(detail => detail["@type"]?.includes("RetryInfo"));
+  if (retryInfo?.retryDelay) {
+    const match = /(?:(\d+)s)|(?:(\d+)ms)/.exec(retryInfo.retryDelay);
+    if (match) {
+      if (match[1]) return Number(match[1]) * 1000;
+      if (match[2]) return Number(match[2]);
+    }
+  }
+  return null;
 }
 
 // ── Cosine similarity ────────────────────────────────────────────────────────

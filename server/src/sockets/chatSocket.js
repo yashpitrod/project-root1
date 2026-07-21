@@ -5,10 +5,10 @@ import { searchCampus } from "../services/vectorStore.js"; // For FAQ
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 const llm = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.1",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
-  temperature: 0.3, 
+  temperature: 0.3,
 });
 
 // ERR-01: Error classification for recoverable vs fatal errors.
@@ -56,7 +56,7 @@ function classifyError(error) {
  * 6. If triageComplete is true, emit triage-complete to frontend.
  */
 export function registerChatHandlers(io, socket) {
-  
+
   socket.on("chat-message", async (data, ack) => {
     try {
       // Validate input
@@ -65,7 +65,7 @@ export function registerChatHandlers(io, socket) {
         if (typeof ack === "function") ack({ status: "error", message: "Missing required fields" });
         return;
       }
-      
+
       // Acknowledge receipt quickly (<200ms requirement)
       if (typeof ack === "function") ack({ status: "received" });
 
@@ -97,7 +97,7 @@ export function registerChatHandlers(io, socket) {
       // Add user message to history
       const userMessage = { role: "user", content: text };
       session.state.conversationHistory.push(userMessage);
-      
+
       // Notify client that assistant is typing
       socket.emit("chat-typing", { sessionId });
 
@@ -107,7 +107,7 @@ export function registerChatHandlers(io, socket) {
       if (session.mode === "triage") {
         // --- TRIAGE MODE (LangGraph) ---
         const finalState = await triageGraph.invoke(session.state);
-        
+
         // ISSUE-3 VERIFICATION:
         // finalState contains ALL graph output including:
         //   - .conversationHistory (from extractionNode input + all turns)
@@ -178,11 +178,11 @@ Follow-up question (natural language, 1-2 sentences):`;
         finalState.responseText = responseText;
         session.state = finalState;
         session.state.conversationHistory.push({ role: "assistant", content: responseText });
-        
+
         // If complete, send sessionId to frontend for the createRequest call
         if (finalState.triageComplete) {
-          socket.emit("triage-complete", { 
-            sessionId, 
+          socket.emit("triage-complete", {
+            sessionId,
             summary: finalState.finalSummary,
             symptoms: finalState.extractedSymptoms,
             riskScore: finalState.riskScore,
@@ -192,13 +192,13 @@ Follow-up question (natural language, 1-2 sentences):`;
       } else {
         // --- FAQ MODE (Campus RAG) ---
         const results = await searchCampus(text, 2);
-        
+
         let prompt = "";
         if (results.length > 0) {
-           const context = results.map(r => `[${r.metadata.section}]: ${r.text}`).join("\n\n");
-           // ISSUE-4 FIX: Explicit grounding constraint — answer ONLY from provided KB,
-           // never from general knowledge. Decline if the answer isn't in the provided context.
-           prompt = `You are a campus health center assistant answering a student's question about campus health policies.
+          const context = results.map(r => `[${r.metadata.section}]: ${r.text}`).join("\n\n");
+          // ISSUE-4 FIX: Explicit grounding constraint — answer ONLY from provided KB,
+          // never from general knowledge. Decline if the answer isn't in the provided context.
+          prompt = `You are a campus health center assistant answering a student's question about campus health policies.
 
 CRITICAL RULES:
 - You MUST answer ONLY using the information provided in the "Campus Policies" section below.
@@ -213,21 +213,21 @@ Student Question: ${text}
 
 Answer (based ONLY on the policies above):`;
         } else {
-           // No KB results found — decline without invoking LLM to avoid hallucination
-           responseText = "I don't have specific information about that in our campus policies. You might want to check with the dispensary front desk directly, or try rephrasing your question.";
-           
-           // Stream the static response for UI consistency
-           const words = responseText.split(" ");
-           for (const word of words) {
-             socket.emit("chat-response", { token: word + " ", done: false });
-           }
-           socket.emit("chat-response", { token: "", done: true });
-           session.state.conversationHistory.push({ role: "assistant", content: responseText });
-           
-           // Save and return early
-           session.markModified('state');
-           await session.save();
-           return;
+          // No KB results found — decline without invoking LLM to avoid hallucination
+          responseText = "I don't have specific information about that in our campus policies. You might want to check with the dispensary front desk directly, or try rephrasing your question.";
+
+          // Stream the static response for UI consistency
+          const words = responseText.split(" ");
+          for (const word of words) {
+            socket.emit("chat-response", { token: word + " ", done: false });
+          }
+          socket.emit("chat-response", { token: "", done: true });
+          session.state.conversationHistory.push({ role: "assistant", content: responseText });
+
+          // Save and return early
+          session.markModified('state');
+          await session.save();
+          return;
         }
 
         // True LLM Streaming (only when KB results were found)
@@ -251,9 +251,9 @@ Answer (based ONLY on the policies above):`;
       console.error("[ChatSocket] Error:", error);
       // ERR-01: Classify the error to determine if it's recoverable
       const classified = classifyError(error);
-      socket.emit("chat-error", { 
-        message: classified.userMessage, 
-        recoverable: classified.recoverable 
+      socket.emit("chat-error", {
+        message: classified.userMessage,
+        recoverable: classified.recoverable
       });
     }
   });

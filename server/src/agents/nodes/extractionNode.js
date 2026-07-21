@@ -1,7 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 const llm = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.1",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
   temperature: 0,
@@ -15,7 +15,7 @@ const llm = new ChatGoogleGenerativeAI({
  */
 export async function extractionNode(state) {
   const { conversationHistory, extractedSymptoms } = state;
-  
+
   // Format history for the prompt
   const historyText = conversationHistory
     .map(msg => `${msg.role === "user" ? "Student" : "Assistant"}: ${msg.content}`)
@@ -43,14 +43,14 @@ Example output:
   try {
     const response = await llm.invoke(prompt);
     let content = response.content.trim();
-    
+
     // Clean up potential markdown formatting from the LLM
     if (content.startsWith("```json")) {
       content = content.replace(/^```json\n/, "").replace(/\n```$/, "");
     }
-    
+
     const newSymptoms = JSON.parse(content);
-    
+
     if (Array.isArray(newSymptoms)) {
       return { extractedSymptoms: newSymptoms };
     }

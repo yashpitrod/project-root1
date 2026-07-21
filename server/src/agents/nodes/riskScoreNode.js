@@ -1,7 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 const llm = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.1",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
   temperature: 0,
@@ -15,7 +15,7 @@ const llm = new ChatGoogleGenerativeAI({
  */
 export async function riskScoreNode(state) {
   const { extractedSymptoms, retrievedCitations } = state;
-  
+
   if (!extractedSymptoms || extractedSymptoms.length === 0) {
     return { riskScore: "Low" };
   }
@@ -49,13 +49,13 @@ Respond with EXACTLY ONE WORD: "Low", "Medium", "High", or "Critical".
   try {
     const response = await llm.invoke(prompt);
     let score = response.content.trim().replace(/[^a-zA-Z]/g, ""); // Remove any punctuation
-    
+
     // Normalize to standard casing
     if (score.toLowerCase() === "critical") score = "Critical";
     else if (score.toLowerCase() === "high") score = "High";
     else if (score.toLowerCase() === "medium") score = "Medium";
     else score = "Low"; // Fallback to Low if unrecognized
-    
+
     return { riskScore: score };
   } catch (error) {
     console.error("[RiskScoreNode] Error:", error.message);

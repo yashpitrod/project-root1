@@ -1,7 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 const llm = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.1",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
   temperature: 0,
@@ -16,7 +16,7 @@ const llm = new ChatGoogleGenerativeAI({
  */
 export async function routingNode(state) {
   const { conversationHistory, extractedSymptoms, retrievedCitations, riskScore } = state;
-  
+
   // Quick heuristic: If we don't have basic symptoms yet, we definitely need follow-up
   if (!extractedSymptoms || extractedSymptoms.length === 0) {
     return { triageComplete: false, needsFollowUp: true };
@@ -63,9 +63,9 @@ Do not include markdown tags, just raw JSON.
     const response = await llm.invoke(prompt);
     let content = response.content.trim();
     if (content.startsWith("```json")) content = content.replace(/^```json\n/, "").replace(/\n```$/, "");
-    
+
     const decision = JSON.parse(content);
-    
+
     if (decision.complete) {
       return await finalizeTriage(state);
     } else {
@@ -81,7 +81,7 @@ Do not include markdown tags, just raw JSON.
 async function finalizeTriage(state) {
   // Generate the final summary for the doctor dashboard
   const { conversationHistory, extractedSymptoms, riskScore } = state;
-  
+
   const historyText = conversationHistory
     .map(msg => `${msg.role === "user" ? "Student" : "Assistant"}: ${msg.content}`)
     .join("\n");
@@ -102,7 +102,7 @@ Provide a 2-3 sentence clinical summary.
   try {
     const response = await llm.invoke(prompt);
     const summary = response.content.trim();
-    
+
     return {
       triageComplete: true,
       needsFollowUp: false,

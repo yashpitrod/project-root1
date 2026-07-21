@@ -1,7 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 const llm = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.1",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
   temperature: 0.3, // Slightly higher temp for more natural conversational tone
@@ -16,7 +16,7 @@ const llm = new ChatGoogleGenerativeAI({
  */
 export async function responseNode(state) {
   const { conversationHistory, retrievedCitations, triageComplete, needsFollowUp, riskScore } = state;
-  
+
   const historyText = conversationHistory
     .map(msg => `${msg.role === "user" ? "Student" : "Assistant"}: ${msg.content}`)
     .join("\n");
