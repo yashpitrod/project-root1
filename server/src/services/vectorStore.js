@@ -93,7 +93,7 @@ async function embedBatch(texts, delayMs = 1500) {
           // Push null — filtered out during indexing
           embeddings.push(null);
         } else {
-          console.warn(`Embedding failed for chunk ${i} (attempt ${attempts}). Retrying in ${Math.round(retryDelayMs / 1000)}s...`);
+          console.warn(`Embedding failed for chunk ${i} (attempt ${attempts}): ${err.message}. Retrying in ${Math.round(retryDelayMs / 1000)}s...`);
           await sleep(retryDelayMs);
         }
       }
@@ -222,10 +222,11 @@ export async function buildVectorStores() {
   const startTime = Date.now();
 
   try {
-    [medicalChunks, campusChunks] = await Promise.all([
-      indexDirectory(MEDICAL_KB_DIR, "medical"),
-      indexDirectory(CAMPUS_KB_DIR, "campus"),
-    ]);
+    // Sequential, not Promise.all — running both KBs in parallel doubles the
+    // concurrent request rate against Gemini's per-minute embedding quota,
+    // which is almost certainly why chunk 0 fails on both stores at once.
+    medicalChunks = await indexDirectory(MEDICAL_KB_DIR, "medical");
+    campusChunks = await indexDirectory(CAMPUS_KB_DIR, "campus");
 
     initialized = true;
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
