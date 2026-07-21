@@ -29,11 +29,30 @@ const CAMPUS_KB_DIR = path.resolve(__dirname, "../knowledge-base/campus");
 const geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // ── Embedding provider configuration ───────────────────────────────────────
-const EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER?.toUpperCase() || "GEMINI";
-const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-1.0";
+const EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER?.toUpperCase();
+const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embed-1.0";
 const GROQ_EMBEDDING_MODEL = process.env.GROQ_EMBEDDING_MODEL || "groq-embedding-1.0";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = process.env.GROQ_API_URL || "https://api.groq.ai/v1/embeddings";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+const supportedProviders = ["GEMINI", "GROQ"];
+const preferredProvider = EMBEDDING_PROVIDER || "GEMINI";
+
+if (!supportedProviders.includes(preferredProvider)) {
+  throw new Error(`Unsupported EMBEDDING_PROVIDER: ${preferredProvider}. Use GEMINI or GROQ.`);
+}
+
+if (preferredProvider === "GEMINI" && !GEMINI_API_KEY && !GROQ_API_KEY) {
+  throw new Error("Either GEMINI_API_KEY or GROQ_API_KEY is required to build embeddings.");
+}
+if (preferredProvider === "GROQ" && !GROQ_API_KEY && !GEMINI_API_KEY) {
+  throw new Error("Either GROQ_API_KEY or GEMINI_API_KEY is required to build embeddings.");
+}
+
+console.log(`[VectorStore] Preferred embedding provider: ${preferredProvider}`);
+console.log(`[VectorStore] Gemini model: ${EMBEDDING_MODEL}`);
+console.log(`[VectorStore] Groq model: ${GROQ_EMBEDDING_MODEL}`);
 
 // ── In-memory stores ────────────────────────────────────────────────────────
 /**
@@ -51,10 +70,34 @@ let initialized = false;
  * @returns {Promise<number[]>}
  */
 async function embedText(text) {
-  if (EMBEDDING_PROVIDER === "GROQ") {
-    return embedTextWithGroq(text);
+  if (preferredProvider === "GROQ") {
+    if (GROQ_API_KEY) {
+      try {
+        return await embedTextWithGroq(text);
+      } catch (err) {
+        console.warn(`[VectorStore] Groq failed, falling back to Gemini: ${err.message}`);
+        if (GEMINI_API_KEY) {
+          return await embedTextWithGemini(text);
+        }
+        throw err;
+      }
+    }
+    return embedTextWithGemini(text);
   }
-  return embedTextWithGemini(text);
+
+  if (GEMINI_API_KEY) {
+    try {
+      return await embedTextWithGemini(text);
+    } catch (err) {
+      console.warn(`[VectorStore] Gemini failed, falling back to Groq: ${err.message}`);
+      if (GROQ_API_KEY) {
+        return await embedTextWithGroq(text);
+      }
+      throw err;
+    }
+  }
+
+  return embedTextWithGroq(text);
 }
 
 async function embedTextWithGemini(text) {
