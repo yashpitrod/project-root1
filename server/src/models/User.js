@@ -27,6 +27,22 @@ const userSchema = new mongoose.Schema(
       required: true
     },
 
+    provider: {
+      type: String,
+      enum: ["firebase", "google", "email", "unknown"],
+      default: "firebase"
+    },
+
+    emailVerified: {
+      type: Boolean,
+      default: false
+    },
+
+    lastLoginAt: {
+      type: Date,
+      default: null
+    },
+
     // Doctor-only fields
     isApproved: {
       type: Boolean,

@@ -22,6 +22,103 @@ const registerSchema = z.object({
   fullName: z.string().trim().optional()
 });
 
+const normalizeEmail = (value) => (value || "").trim().toLowerCase();
+
+const syncUserFromFirebase = async ({ uid, email, name, provider = "firebase", requestedRole }) => {
+  const normalizedEmail = normalizeEmail(email);
+  const safeName = (name || normalizedEmail.split("@")[0] || "Campus User").trim();
+  const isDoctor = allowedDoctors.includes(normalizedEmail);
+  const allowedRoles = ["student", "staff"];
+  const baseRole = isDoctor
+    ? "doctor"
+    : (requestedRole && allowedRoles.includes(requestedRole))
+      ? requestedRole
+      : "student";
+
+  let user = await User.findOne({ uid });
+
+  if (user) {
+    const nextRole = isDoctor ? "doctor" : user.role || baseRole;
+    const nextApproved = isDoctor || user.isApproved;
+
+    user.email = normalizedEmail;
+    user.name = safeName;
+    user.provider = provider;
+    user.lastLoginAt = new Date();
+    user.role = nextRole;
+    user.isApproved = nextApproved;
+    user.emailVerified = true;
+
+    await user.save();
+    return user;
+  }
+
+  user = await User.findOne({ email: normalizedEmail });
+
+  if (user) {
+    if (!user.uid) {
+      user.uid = uid;
+    } else if (user.uid !== uid) {
+      const error = new Error("This email is already linked to a different account.");
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const nextRole = isDoctor ? "doctor" : user.role || baseRole;
+    const nextApproved = isDoctor || user.isApproved;
+
+    user.email = normalizedEmail;
+    user.name = safeName;
+    user.provider = provider;
+    user.lastLoginAt = new Date();
+    user.role = nextRole;
+    user.isApproved = nextApproved;
+    user.emailVerified = true;
+
+    await user.save();
+    return user;
+  }
+
+  return User.create({
+    uid,
+    email: normalizedEmail,
+    name: safeName,
+    role: baseRole,
+    provider,
+    isApproved: isDoctor,
+    emailVerified: true,
+    lastLoginAt: new Date(),
+  });
+};
+
+// ---------------- SYNC ----------------
+router.post("/sync", verifyFirebaseOnly, async (req, res) => {
+  try {
+    const { role: requestedRole, fullName, provider } = req.body || {};
+    const user = await syncUserFromFirebase({
+      uid: req.firebaseUser.uid,
+      email: req.firebaseUser.email,
+      name: fullName || req.firebaseUser.name,
+      provider: provider || req.firebaseUser.provider || "firebase",
+      requestedRole,
+    });
+
+    res.status(200).json(user);
+  } catch (err) {
+    console.error("SYNC ERROR:", err.message);
+
+    if (err.code === 11000) {
+      return res.status(409).json({ message: "User already exists. Please login." });
+    }
+
+    if (err.statusCode === 409) {
+      return res.status(409).json({ message: err.message });
+    }
+
+    res.status(500).json({ message: "Authentication sync failed" });
+  }
+});
+
 // ---------------- REGISTER ----------------
 router.post("/register", verifyFirebaseOnly, async (req, res) => {
   try {
@@ -34,65 +131,27 @@ router.post("/register", verifyFirebaseOnly, async (req, res) => {
       });
     }
 
-    const { uid, email, name } = req.firebaseUser;
     const { role: requestedRole, fullName } = parseResult.data;
-
-    // AU-02 FIX: Simplified registration flow to prevent race condition / privilege escalation.
-    // 1. Check by UID first (primary identifier)
-    let user = await User.findOne({ uid });
-
-    if (user) {
-      // User already exists by UID — return as-is, no role changes
-      return res.status(200).json(user);
-    }
-
-    // 2. Check by email (for users who may have been pre-created without a UID)
-    user = await User.findOne({ email });
-
-    if (user) {
-      if (!user.uid) {
-        // Attach Firebase UID to existing record
-        user.uid = uid;
-        await user.save();
-      } else if (user.uid !== uid) {
-        // Different Firebase account trying to register with same email — block it
-        return res.status(409).json({
-          message: "This email is already linked to a different account.",
-        });
-      }
-      // AU-02: Do NOT return the existing user without re-validating the role.
-      // If the existing record had a doctor role but the email is no longer whitelisted,
-      // this is still safe because the user was previously approved.
-      return res.status(200).json(user);
-    }
-
-    // 3. New user — determine role
-    const isDoctor = allowedDoctors.includes(email);
-
-    const allowedRoles = ["student", "staff"];
-    const role = isDoctor
-      ? "doctor"
-      : (requestedRole && allowedRoles.includes(requestedRole))
-        ? requestedRole
-        : "student";
-
-    user = await User.create({
-      uid,
-      email,
-      name: fullName || name,
-      role,
-      isApproved: isDoctor,
+    const user = await syncUserFromFirebase({
+      uid: req.firebaseUser.uid,
+      email: req.firebaseUser.email,
+      name: fullName || req.firebaseUser.name,
+      provider: req.firebaseUser.provider || "firebase",
+      requestedRole,
     });
 
     res.status(201).json(user);
   } catch (err) {
     console.error("REGISTER ERROR:", err);
 
-    // ✅ Handle duplicate email safely
     if (err.code === 11000) {
       return res.status(409).json({
         message: "User already exists. Please login."
       });
+    }
+
+    if (err.statusCode === 409) {
+      return res.status(409).json({ message: err.message });
     }
 
     res.status(500).json({ message: "Registration failed" });
@@ -102,17 +161,13 @@ router.post("/register", verifyFirebaseOnly, async (req, res) => {
 // ---------------- ME ----------------
 router.get("/me", verifyToken, async (req, res) => {
   try {
-    // AU-07: Use req.user from verifyToken middleware instead of double-querying DB
-    const user = req.user;
-    const email = req.firebaseUser.email;
-    const isDoctor = allowedDoctors.includes(email);
-
-    // Doctor auto-upgrade safety
-    if (isDoctor && user.role !== "doctor") {
-      user.role = "doctor";
-      user.isApproved = true;
-      await user.save();
-    }
+    const user = await syncUserFromFirebase({
+      uid: req.firebaseUser.uid,
+      email: req.firebaseUser.email,
+      name: req.firebaseUser.name,
+      provider: req.firebaseUser.provider || "firebase",
+      requestedRole: req.user?.role,
+    });
 
     res.json(user);
   } catch (err) {

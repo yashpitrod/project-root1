@@ -19,11 +19,14 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({ message: "Token missing email" });
     }
 
+    const provider = decoded.firebase?.sign_in_provider || "firebase";
+
     /* 🔥 Firebase identity (always available) */
     req.firebaseUser = {
       uid: decoded.uid,
       email: decoded.email.toLowerCase(),
       name: decoded.name || decoded.email.split("@")[0],
+      provider,
     };
 
     /* 🔥 MongoDB user (required for protected routes) */

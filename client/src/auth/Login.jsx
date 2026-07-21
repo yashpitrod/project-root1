@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from "./navbar";
 import '../styles/auth.css';
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "./firebase";
+import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "./firebase";
 import campusImg from "../assets/campus.png";
 
 
@@ -23,6 +23,39 @@ const Login = () => {
     return gmailRegex.test(email);
   };
 
+  const persistAuthSession = async (token, userData) => {
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(userData));
+
+    if (userData.role === "doctor") {
+      navigate("/doctor", { replace: true });
+    } else {
+      navigate("/student", { replace: true });
+    }
+  };
+
+  const syncUserWithBackend = async (userCred, provider = "firebase") => {
+    const token = await userCred.user.getIdToken();
+    const res = await fetch(`${API_BASE_URL}/api/auth/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ provider }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to sync user");
+    }
+
+    const data = await res.json();
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(data));
+    return { token, data };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -31,42 +64,28 @@ const Login = () => {
     setError("");
 
     try {
-      // 1️⃣ Firebase login
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-
-      // 2️⃣ Get ID token (NO force refresh)
-      const token = await userCred.user.getIdToken();
-
-      // 3️⃣ Ask backend who this user is
-      const res = await fetch(
-        `${API_BASE_URL}/api/auth/me`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!res.ok) {
-        throw new Error("Failed to verify user");
-      }
-
-      const data = await res.json();
-
-      // H-03: Persist token + user so dashboards can read them from localStorage.
-      // Token is also kept fresh via AuthContext.getToken() for API calls.
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(data));
-
-      // 4️⃣ Route by role
-      if (data.role === "doctor") {
-        navigate("/doctor", { replace: true });
-      } else {
-        navigate("/student", { replace: true });
-      }
-
+      const { data } = await syncUserWithBackend(userCred, "email");
+      await persistAuthSession(localStorage.getItem("token"), data);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (loading) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const userCred = await signInWithPopup(auth, googleProvider);
+      const { data } = await syncUserWithBackend(userCred, "google");
+      await persistAuthSession(localStorage.getItem("token"), data);
+    } catch (err) {
+      setError(err.message || "Google sign-in failed");
     } finally {
       setLoading(false);
     }
@@ -189,6 +208,16 @@ const Login = () => {
                   disabled={loading}
                 >
                   {loading ? "Signing in..." : "Sign In"}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  style={{ marginTop: "12px", background: "#fff", color: "#111827", border: "1px solid #d1d5db" }}
+                >
+                  {loading ? "Working..." : "Continue with Google"}
                 </button>
                 <div className="auth-footer" style={{ marginTop: "12px" }}>
                   <Link to="/forgot-password" className="auth-link">

@@ -5,6 +5,7 @@ import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
+  GoogleAuthProvider,
 } from "firebase/auth";
 // (optional analytics)
 import { getAnalytics } from "firebase/analytics";
@@ -24,6 +25,9 @@ const app = initializeApp(firebaseConfig);
 
 // ✅ EXPORT AUTH (THIS WAS MISSING)
 export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
+
 setPersistence(auth, browserLocalPersistence).catch((err) => {
   console.warn("Auth persistence could not be set:", err);
 });

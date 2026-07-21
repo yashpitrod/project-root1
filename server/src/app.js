@@ -12,6 +12,8 @@ import doctorRoutes from "./routes/doctorRoutes.js";
 
 const app = express();
 
+app.disable("x-powered-by");
+
 // EX-01: Helmet — sets security headers (CSP, HSTS, X-Frame-Options, hides X-Powered-By)
 // Disabling CSP since this is a pure JSON API and serves no HTML
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -26,7 +28,14 @@ export const allowedOrigins = [
 console.log(`Allowed CORS origins: ${allowedOrigins.join(", ")}`);
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error("Not allowed by CORS"));
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -38,7 +47,13 @@ app.use(compression());
 // EX-04: Morgan — request logging (using "dev" format, switch to "combined" for production if preferred)
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
-app.use(express.json());
+app.use(express.json({ limit: "256kb" }));
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
 
 // EX-02: Global rate limiter — 300 requests per 15 minutes per IP
 const globalLimiter = rateLimit({

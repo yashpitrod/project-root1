@@ -12,12 +12,14 @@ const verifyFirebaseOnly = async (req, res, next) => {
     const token = authHeader.split(" ")[1];
 
     const decoded = await admin.auth().verifyIdToken(token);
+    const provider = decoded.firebase?.sign_in_provider || "firebase";
 
     // AU-06: Use decoded.uid internally
     req.firebaseUser = {
       uid: decoded.uid,
       email: decoded.email.toLowerCase(),
       name: decoded.name || decoded.email.split("@")[0],
+      provider,
     };
 
     next();
