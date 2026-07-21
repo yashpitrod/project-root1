@@ -1,7 +1,12 @@
 import mongoose from "mongoose";
 
+let cachedConnection = null;
+
 const connectDB = async () => {
-  // DB-01: Guard against missing MONGO_URI before attempting connection
+  if (cachedConnection) {
+    return cachedConnection;
+  }
+
   const uri = process.env.MONGO_URI;
   if (!uri) {
     console.error("❌ MONGO_URI environment variable is not set");
@@ -9,20 +14,27 @@ const connectDB = async () => {
   }
 
   try {
-    // DB-02: Add timeout options so queries fail fast instead of hanging if the DB goes down
-    await mongoose.connect(uri, {
+    cachedConnection = await mongoose.connect(uri, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      retryWrites: true,
+      autoIndex: true,
     });
+
     console.log("✅ MongoDB connected");
 
-    // DB-03: Add event listeners for dropped connections
     mongoose.connection.on("disconnected", () => {
       console.warn("⚠️ MongoDB disconnected");
+      cachedConnection = null;
     });
+
     mongoose.connection.on("error", (err) => {
       console.error("❌ MongoDB connection error:", err);
     });
+
+    return cachedConnection;
   } catch (error) {
     console.error("❌ MongoDB connection failed");
     console.error(error.message);

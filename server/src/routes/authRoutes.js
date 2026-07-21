@@ -24,6 +24,20 @@ const registerSchema = z.object({
 
 const normalizeEmail = (value) => (value || "").trim().toLowerCase();
 
+const serializeUser = (user) => ({
+  _id: user._id,
+  uid: user.uid,
+  email: user.email,
+  name: user.name,
+  role: user.role,
+  provider: user.provider,
+  emailVerified: user.emailVerified,
+  isApproved: user.isApproved,
+  availability: user.availability,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
+
 const syncUserFromFirebase = async ({ uid, email, name, provider = "firebase", requestedRole }) => {
   const normalizedEmail = normalizeEmail(email);
   const safeName = (name || normalizedEmail.split("@")[0] || "Campus User").trim();
@@ -35,51 +49,72 @@ const syncUserFromFirebase = async ({ uid, email, name, provider = "firebase", r
       ? requestedRole
       : "student";
 
-  let user = await User.findOne({ uid });
+  const [byUidUser, byEmailUser] = await Promise.all([
+    User.findOne({ uid }).lean(),
+    User.findOne({ email: normalizedEmail }).lean(),
+  ]);
 
-  if (user) {
-    const nextRole = isDoctor ? "doctor" : user.role || baseRole;
-    const nextApproved = isDoctor || user.isApproved;
+  if (byUidUser) {
+    const nextRole = isDoctor ? "doctor" : byUidUser.role || baseRole;
+    const nextApproved = isDoctor || byUidUser.isApproved;
 
-    user.email = normalizedEmail;
-    user.name = safeName;
-    user.provider = provider;
-    user.lastLoginAt = new Date();
-    user.role = nextRole;
-    user.isApproved = nextApproved;
-    user.emailVerified = true;
+    const updated = await User.findOneAndUpdate(
+      { uid },
+      {
+        $set: {
+          email: normalizedEmail,
+          name: safeName,
+          provider,
+          lastLoginAt: new Date(),
+          role: nextRole,
+          isApproved: nextApproved,
+          emailVerified: true,
+        },
+      },
+      { new: true, runValidators: true }
+    ).lean();
 
-    await user.save();
-    return user;
+    return serializeUser(updated);
   }
 
-  user = await User.findOne({ email: normalizedEmail });
+  if (byEmailUser) {
+    if (!byEmailUser.uid) {
+      const updated = await User.findOneAndUpdate(
+        { email: normalizedEmail },
+        { $set: { uid, provider, lastLoginAt: new Date(), emailVerified: true } },
+        { new: true, runValidators: true }
+      ).lean();
+      return serializeUser(updated);
+    }
 
-  if (user) {
-    if (!user.uid) {
-      user.uid = uid;
-    } else if (user.uid !== uid) {
+    if (byEmailUser.uid !== uid) {
       const error = new Error("This email is already linked to a different account.");
       error.statusCode = 409;
       throw error;
     }
 
-    const nextRole = isDoctor ? "doctor" : user.role || baseRole;
-    const nextApproved = isDoctor || user.isApproved;
+    const nextRole = isDoctor ? "doctor" : byEmailUser.role || baseRole;
+    const nextApproved = isDoctor || byEmailUser.isApproved;
 
-    user.email = normalizedEmail;
-    user.name = safeName;
-    user.provider = provider;
-    user.lastLoginAt = new Date();
-    user.role = nextRole;
-    user.isApproved = nextApproved;
-    user.emailVerified = true;
+    const updated = await User.findOneAndUpdate(
+      { email: normalizedEmail },
+      {
+        $set: {
+          name: safeName,
+          provider,
+          lastLoginAt: new Date(),
+          role: nextRole,
+          isApproved: nextApproved,
+          emailVerified: true,
+        },
+      },
+      { new: true, runValidators: true }
+    ).lean();
 
-    await user.save();
-    return user;
+    return serializeUser(updated);
   }
 
-  return User.create({
+  const created = await User.create({
     uid,
     email: normalizedEmail,
     name: safeName,
@@ -89,6 +124,8 @@ const syncUserFromFirebase = async ({ uid, email, name, provider = "firebase", r
     emailVerified: true,
     lastLoginAt: new Date(),
   });
+
+  return serializeUser(created);
 };
 
 // ---------------- SYNC ----------------

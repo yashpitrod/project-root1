@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from "./navbar";
 import '../styles/auth.css';
@@ -6,24 +6,16 @@ import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import campusImg from "../assets/campus.png";
 
-
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  //Loading state can be used to show a spinner during login
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  //Url to call backend API 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  const API_BASE_URL = useMemo(() => import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', []);
 
-  const validateEmail = (email) => {
-    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
-    return gmailRegex.test(email);
-  };
-
-  const persistAuthSession = async (token, userData) => {
+  const persistAuthSession = useCallback((token, userData) => {
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(userData));
 
@@ -32,9 +24,9 @@ const Login = () => {
     } else {
       navigate("/student", { replace: true });
     }
-  };
+  }, [navigate]);
 
-  const syncUserWithBackend = async (userCred, provider = "firebase") => {
+  const syncUserWithBackend = useCallback(async (userCred, provider = "firebase") => {
     const token = await userCred.user.getIdToken();
     const res = await fetch(`${API_BASE_URL}/api/auth/sync`, {
       method: "POST",
@@ -51,10 +43,8 @@ const Login = () => {
     }
 
     const data = await res.json();
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(data));
     return { token, data };
-  };
+  }, [API_BASE_URL]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -65,11 +55,10 @@ const Login = () => {
 
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-      const { data } = await syncUserWithBackend(userCred, "email");
-      await persistAuthSession(localStorage.getItem("token"), data);
+      const { token, data } = await syncUserWithBackend(userCred, "email");
+      persistAuthSession(token, data);
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -82,11 +71,10 @@ const Login = () => {
 
     try {
       const userCred = await signInWithPopup(auth, googleProvider);
-      const { data } = await syncUserWithBackend(userCred, "google");
-      await persistAuthSession(localStorage.getItem("token"), data);
+      const { token, data } = await syncUserWithBackend(userCred, "google");
+      persistAuthSession(token, data);
     } catch (err) {
       setError(err.message || "Google sign-in failed");
-    } finally {
       setLoading(false);
     }
   };

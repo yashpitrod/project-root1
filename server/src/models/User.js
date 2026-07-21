@@ -5,14 +5,16 @@ const userSchema = new mongoose.Schema(
     uid: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
+      index: true
     },
 
     email: {
       type: String,
       required: true,
       lowercase: true,
-      unique: true
+      unique: true,
+      index: true
     },
 
     name: {
@@ -57,6 +59,9 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+userSchema.index({ uid: 1 }, { unique: true, name: "uid_idx" });
+userSchema.index({ email: 1 }, { unique: true, name: "email_idx" });
 
 const User = mongoose.model("User", userSchema);
 export default User;
