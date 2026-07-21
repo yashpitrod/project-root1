@@ -30,14 +30,17 @@ const geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // ── Embedding provider configuration ───────────────────────────────────────
 const EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER?.toUpperCase();
-const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embed-1.0";
+const RAW_GEMINI_EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL;
+const EMBEDDING_MODEL = RAW_GEMINI_EMBEDDING_MODEL === "gemini-embedding-1.0"
+  ? "gemini-embed-1.0"
+  : RAW_GEMINI_EMBEDDING_MODEL || "gemini-embed-1.0";
 const GROQ_EMBEDDING_MODEL = process.env.GROQ_EMBEDDING_MODEL || "groq-embedding-1.0";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = process.env.GROQ_API_URL || "https://api.groq.ai/v1/embeddings";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 const supportedProviders = ["GEMINI", "GROQ"];
-const preferredProvider = EMBEDDING_PROVIDER || "GEMINI";
+const preferredProvider = EMBEDDING_PROVIDER || (GROQ_API_KEY ? "GROQ" : "GEMINI");
 
 if (!supportedProviders.includes(preferredProvider)) {
   throw new Error(`Unsupported EMBEDDING_PROVIDER: ${preferredProvider}. Use GEMINI or GROQ.`);
@@ -118,25 +121,29 @@ async function embedTextWithGroq(text) {
     throw new Error("GROQ_API_KEY is required when EMBEDDING_PROVIDER=GROQ");
   }
 
+  const payload = {
+    model: GROQ_EMBEDDING_MODEL,
+    input: text,
+  };
+
+  console.log(`[VectorStore] Groq embedding request payload: ${JSON.stringify(payload).slice(0, 200)}`);
+
   const response = await fetch(GROQ_API_URL, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${GROQ_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: GROQ_EMBEDDING_MODEL,
-      input: text,
-    }),
+    body: JSON.stringify(payload),
   });
 
+  const bodyText = await response.text();
   if (!response.ok) {
-    const bodyText = await response.text();
     throw new Error(`Groq embedding failed (${response.status}): ${bodyText}`);
   }
 
-  const data = await response.json();
-  const values = data?.data?.[0]?.embedding || data?.embedding || data?.embeddings?.[0]?.values;
+  const data = JSON.parse(bodyText);
+  const values = data?.data?.[0]?.embedding || data?.embedding || data?.embeddings?.[0]?.values || data?.results?.[0]?.embedding;
 
   if (!Array.isArray(values) || values.length === 0) {
     throw new Error(`Empty embedding returned from Groq for text: "${text.slice(0, 60)}..."`);
