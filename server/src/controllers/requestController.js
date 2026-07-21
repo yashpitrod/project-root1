@@ -1,14 +1,17 @@
 import Request from "../models/Request.js";
 import User from "../models/User.js"; // CT-01: Needed for doctorId validation
+import ChatSession from "../models/ChatSession.js"; // SEC-01: Server-side triage data lookup
 import mongoose from "mongoose";
-import { translateToEnglish } from "../config/gemini.js";
+
 import { z } from "zod";
 
+// SEC-01: Client only submits sessionId + doctor/time-slot selection.
+// All triage data (riskScore, symptoms, summary, citations) is pulled
+// server-side from the ChatSession document written by the pipeline.
 const createRequestSchema = z.object({
-  problem: z.string().trim().min(1, "Problem description is required").max(2000, "Problem description is too long (maximum 2000 characters)"),
+  sessionId: z.string().min(1, "Session ID is required"),
   doctorId: z.string().refine((val) => mongoose.Types.ObjectId.isValid(val), "Invalid doctor ID"),
   timeSlot: z.string().min(1, "Time slot is required"),
-  alreadyTranslated: z.boolean().optional()
 });
 
 const updateStatusSchema = z.object({
@@ -37,7 +40,52 @@ export const createRequest = async (req, res) => {
       });
     }
 
-    const { problem, doctorId, timeSlot, alreadyTranslated } = parseResult.data;
+    const { sessionId, doctorId, timeSlot } = parseResult.data;
+
+    // SEC-01: Look up the ChatSession and pull triage data from the server-written state.
+    // This prevents any client from fabricating riskScore, symptoms, or summary.
+    const chatSession = await ChatSession.findOne({ sessionId });
+    if (!chatSession) {
+      return res.status(400).json({
+        success: false,
+        message: "No active chat session found for this request. Please complete the triage chat first.",
+      });
+    }
+
+    if (chatSession.mode !== "triage") {
+      return res.status(400).json({
+        success: false,
+        message: "Only triage sessions can create appointment requests.",
+      });
+    }
+
+    if (!chatSession.state?.triageComplete) {
+      return res.status(400).json({
+        success: false,
+        message: "Triage is not complete. Please finish the chat conversation first.",
+      });
+    }
+
+    // SEC-01: Verify the session belongs to this user
+    if (chatSession.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "This session does not belong to you.",
+      });
+    }
+
+    // Pull all triage data from the trusted, pipeline-written session state
+    const triageSummary = chatSession.state.finalSummary || "Triage completed via AI assistant.";
+    const extractedSymptoms = chatSession.state.extractedSymptoms || [];
+    const riskScore = chatSession.state.riskScore || "Low";
+    const kbCitations = (chatSession.state.retrievedCitations || []).map(c => ({
+      source: c.source || "",
+      section: c.section || "",
+      text: c.text || ""
+    }));
+    // Use the first user message as the originalProblem
+    const firstUserMsg = chatSession.state.conversationHistory?.find(m => m.role === "user");
+    const originalProblem = firstUserMsg?.content || triageSummary;
 
     // CT-01: Validate that doctorId references a real, approved doctor
     const doctor = await User.findOne({
@@ -52,16 +100,19 @@ export const createRequest = async (req, res) => {
       });
     }
 
-    const finalEnglishText = alreadyTranslated
-      ? problem
-      : await translateToEnglish(problem);
+    const priorities = { "Critical": 4, "High": 3, "Medium": 2, "Low": 1 };
+    const pLevel = priorities[riskScore] || 1;
 
     const request = await Request.create({
       studentId: req.user._id,
       doctorId,
-      originalProblem: problem,        // 👈 RAW USER INPUT
-      problem: finalEnglishText,        // 👈 ENGLISH ONLY,
+      triageSummary,
+      originalProblem,
       timeSlot,
+      extractedSymptoms,
+      kbCitations,
+      riskScore,
+      riskPriority: pLevel,
       status: "pending",
     });
     const io = req.app.get("io");
@@ -69,6 +120,12 @@ export const createRequest = async (req, res) => {
       io.to(doctorId.toString()).emit("new-request", {
         request,
       });
+      if (riskScore === "Critical") {
+        io.to(doctorId.toString()).emit("emergency-alert", {
+          message: "A critical triage request requires your immediate attention!",
+          request,
+        });
+      }
     }
     res.status(201).json({
       success: true,
@@ -156,7 +213,7 @@ export const getDoctorRequests = async (req, res) => {
     const [requests, totalCount] = await Promise.all([
       Request.find(query)
         .populate("studentId", "name email")
-        .sort({ createdAt: -1 })
+        .sort({ riskPriority: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit),
       Request.countDocuments(query)

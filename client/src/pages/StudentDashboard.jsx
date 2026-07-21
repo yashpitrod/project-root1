@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import { auth } from "../auth/firebase";
 import '../styles/studentdash.css';
+import ChatBot from "../components/ChatBot";
 
 //Url to call backend API
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -25,6 +26,9 @@ const StudentDashboard = () => {
     const [recentRequest, setRecentRequest] = useState(null);
     // State to track doctor queues (for future use)
     const [doctorQueues, setDoctorQueues] = useState({});
+    
+    // Triage State from ChatBot
+    const [triageData, setTriageData] = useState(null);
 
     // State to control appointment banner visibility
     const [showAppointmentBanner, setShowAppointmentBanner] = useState(false);
@@ -301,32 +305,16 @@ const StudentDashboard = () => {
             return;
         }
 
+        // SEC-01: Require completed triage session before booking
+        if (!triageData || !triageData.sessionId) {
+            alert("Please complete the triage chat before booking an appointment.");
+            return;
+        }
+
         try {
-            let textToSend = translated ? translatedText : problem;
-
-            if (!translated) {
-                try {
-                    const freshToken = await getFreshToken();
-                    const res = await fetch(`${API_BASE_URL}/api/translate`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${freshToken}`,
-                        },
-                        body: JSON.stringify({ text: problem }),
-                    });
-
-                    const data = await res.json();
-                    if (data.success) {
-                        textToSend = data.translatedText;
-                        setTranslatedText(data.translatedText);
-                        setTranslated(true);
-                    }
-                } catch (err) {
-                    console.error("Auto-translate failed");
-                }
-            }
             const freshToken = await getFreshToken();
+            // SEC-01: Send ONLY sessionId + doctor/timeSlot selection.
+            // Server pulls all triage data from the ChatSession document.
             const res = await fetch(`${API_BASE_URL}/api/requests`, {
                 method: "POST",
                 headers: {
@@ -334,15 +322,15 @@ const StudentDashboard = () => {
                     Authorization: `Bearer ${freshToken}`,
                 },
                 body: JSON.stringify({
-                    problem: textToSend,
-                    alreadyTranslated: true,
+                    sessionId: triageData.sessionId,
                     doctorId: selectedDoctor,
                     timeSlot: selectedTimeSlot,
                 }),
             });
 
             if (!res.ok) {
-                throw new Error("Failed to book appointment");
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || "Failed to book appointment");
             }
 
             const data = await res.json();
@@ -350,7 +338,7 @@ const StudentDashboard = () => {
 
             const newRequest = {
                 _id: data.request._id,
-                problem: data.request.problem,              // English 
+                triageSummary: data.request.triageSummary,
                 originalProblem: data.request.originalProblem,
                 doctorId: selectedDoctor,
                 doctorName: doctorObj?.name || "Doctor",
@@ -365,18 +353,20 @@ const StudentDashboard = () => {
             setShowAppointmentBanner(true);
 
             localStorage.setItem("recentRequest", JSON.stringify(newRequest));
-            // reset form
+            // reset form and clear sessionStorage so a fresh session starts
             setProblem("");
             setTranslated(false);
             setTranslatedText("");
             setSelectedDoctor(null);
             setSelectedTimeSlot("");
+            setTriageData(null);
+            sessionStorage.removeItem("chatSessionId");
 
             // Show appointment banner
             setShowAppointmentBanner(true);
         } catch (error) {
             console.error("Submission error:", error);
-            alert("Failed to submit request. Please try again.");
+            alert(error.message || "Failed to submit request. Please try again.");
         }
     };
 
@@ -429,46 +419,38 @@ const StudentDashboard = () => {
                 <div className="left-column">
                     {/* Submit Health Request Card */}
                     <div className="card health-request-card">
-                        <div className="card-header">
-                            <div className="card-icon send-icon">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h2>Submit Health Request</h2>
-                                <p>Describe your problem in any language</p>
-                            </div>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Describe Your Problem <span className="label-hint">(Any Language)</span></label>
-                            <textarea
-                                className="problem-textarea"
-                                placeholder="अपनी समस्या यहाँ लिखें... / Write your problem here..."
-                                value={problem}
-                                onChange={(e) => {
-                                    setProblem(e.target.value);
-                                    setTranslated(false);
-                                    setTranslatedText("");
-                                }}
-                                rows={5}
+                        {!triageData ? (
+                            <ChatBot 
+                                token={token} 
+                                API_BASE_URL={API_BASE_URL} 
+                                onTriageComplete={(sessionId, summary, symptoms, riskScore) => {
+                                    setTriageData({ sessionId, summary, symptoms, riskScore });
+                                }} 
                             />
-                        </div>
-
-                        <button className="translate-btn" onClick={handleTranslate}>
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3 5H15M9 3V5M10.048 11.5C11.2034 9.49102 12.8097 7.7729 14.746 6.48L17 5M7 15L10 19L12 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M14 17L17 21L21 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            Translate to English
-                        </button>
-
-                        {translatedText && (
-                            <div className="translated-text">
-                                {translatedText}
-                            </div>
-                        )}
+                        ) : (
+                            <>
+                                <div className="p-6 mb-6 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">Triage Summary</h3>
+                                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${triageData.riskScore === 'Critical' ? 'bg-red-100 text-red-700' : triageData.riskScore === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                                            Risk: {triageData.riskScore}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-4">{triageData.summary}</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {triageData.symptoms?.map((sym, idx) => (
+                                            <span key={idx} className="px-2.5 py-1 bg-white dark:bg-slate-800 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
+                                                {sym}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <button 
+                                        className="mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                        onClick={() => setTriageData(null)}
+                                    >
+                                        ← Start over
+                                    </button>
+                                </div>
 
                         {/* Doctor Selection */}
                         <div className="doctor-selection">
@@ -530,12 +512,14 @@ const StudentDashboard = () => {
 
                         {/* Submit Button */}
                         <button
-                            className="submit-btn"
+                            className="submit-btn mt-6"
                             onClick={handleSubmit}
-                            disabled={!selectedDoctor || !selectedTimeSlot || !problem.trim()}
+                            disabled={!selectedDoctor || !selectedTimeSlot}
                         >
-                            Submit Request
+                            Finalize Request
                         </button>
+                        </>
+                        )}
 
                         {/* Appointment Status */}
                         {showAppointmentBanner && recentRequest && appointmentStatus && (

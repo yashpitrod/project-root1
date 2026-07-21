@@ -8,8 +8,17 @@ import User from "./src/models/User.js"; // AU-05: Needed for server-side MongoD
 import connectDB from "./src/config/db.js";
 import app, { allowedOrigins } from "./src/app.js";
 import mongoose from "mongoose";
+import { buildVectorStores } from "./src/services/vectorStore.js";
+import { registerChatHandlers } from "./src/sockets/chatSocket.js";
 
 connectDB();
+
+// KB-01: Build vector stores at startup after DB connects.
+// Runs async — does not block the HTTP server from starting.
+// A failure logs a warning but does not crash the process.
+buildVectorStores().catch((err) => {
+  console.warn("[Startup] Vector store build failed — triage RAG will be unavailable:", err.message);
+});
 
 const PORT = process.env.PORT || 5000;
 
@@ -64,6 +73,9 @@ io.on("connection", (socket) => {
   if (socket.user?.mongoId) {
     socket.join(socket.user.mongoId);
   }
+
+  // Register chat handlers
+  registerChatHandlers(io, socket);
 
   socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);

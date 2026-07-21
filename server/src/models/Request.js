@@ -12,14 +12,33 @@ const requestSchema = new mongoose.Schema(
       ref: "User",          // Doctor user
       required: true,
     },
-    problem: {
+    triageSummary: {
       type: String,
-      required: true, // English (final)
+      required: true,
     },
     originalProblem: {
       type: String,
       required: true, // What student typed
     },
+    extractedSymptoms: {
+      type: [String],
+      default: [],
+    },
+    riskScore: {
+      type: String,
+      enum: ["Critical", "High", "Medium", "Low"],
+      default: "Low",
+    },
+    riskPriority: {
+      type: Number,
+      default: 1, // Critical=4, High=3, Medium=2, Low=1
+      index: true
+    },
+    kbCitations: [{
+      source: String,
+      section: String,
+      text: String
+    }],
     timeSlot: {
       type: String,
       required: true,

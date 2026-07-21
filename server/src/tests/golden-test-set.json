@@ -1,0 +1,82 @@
+[
+  {
+    "input": "I have a mild headache since this morning, probably just didn't sleep well",
+    "expectedTier": "Low"
+  },
+  {
+    "input": "My nose is runny and I have a slight scratchy throat",
+    "expectedTier": "Low"
+  },
+  {
+    "input": "I have been feeling really tired and fatigued for the past two days after exams",
+    "expectedTier": "Low"
+  },
+  {
+    "input": "I have a small cut on my finger from cooking, it stopped bleeding but hurts a bit",
+    "expectedTier": "Low"
+  },
+  {
+    "input": "Stomach pain after eating cafeteria food, with some vomiting and diarrhea today",
+    "expectedTier": "Medium"
+  },
+  {
+    "input": "I twisted my ankle playing basketball and it's quite swollen, I can hobble but it hurts",
+    "expectedTier": "Medium"
+  },
+  {
+    "input": "I have a fever of 101F and body aches since yesterday",
+    "expectedTier": "Medium"
+  },
+  {
+    "input": "My ear really hurts and it feels blocked",
+    "expectedTier": "Medium"
+  },
+  {
+    "input": "High fever of 104F that won't go down with paracetamol, I feel confused and my neck is stiff",
+    "expectedTier": "Critical"
+  },
+  {
+    "input": "Suddenly I got the worst headache of my life, it feels like a thunderclap",
+    "expectedTier": "Critical"
+  },
+  {
+    "input": "I'm having trouble breathing, my chest feels tight and my inhaler isn't working",
+    "expectedTier": "Critical"
+  },
+  {
+    "input": "I just got stung by a bee and my lips and tongue are swelling up fast, hard to breathe",
+    "expectedTier": "Critical"
+  },
+  {
+    "input": "I fell off my bike and I think my arm is broken, it looks deformed",
+    "expectedTier": "High"
+  },
+  {
+    "input": "I have terrible pain in my lower right stomach, it hurts really bad when I press it",
+    "expectedTier": "High"
+  },
+  {
+    "input": "I've been vomiting blood for the last hour",
+    "expectedTier": "Critical"
+  },
+  {
+    "input": "I have a rash that is spreading fast and a high fever of 102F",
+    "expectedTier": "High"
+  },
+  {
+    "input": "It burns really bad when I pee and my back is starting to hurt too",
+    "expectedTier": "High"
+  },
+  {
+    "input": "I have been having panic attacks every day this week and I feel completely overwhelmed",
+    "expectedTier": "Medium"
+  },
+  {
+    "input": "I feel so dizzy every time I stand up, and I haven't peed since yesterday",
+    "expectedTier": "High"
+  },
+  {
+    "input": "I have a toothache that is keeping me awake at night, my cheek is starting to swell",
+    "expectedTier": "Medium"
+  }
+]

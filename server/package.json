@@ -8,7 +8,9 @@
     },
     "scripts": {
         "start": "node index.js",
-        "dev": "nodemon index.js"
+        "dev": "nodemon index.js",
+        "verify:kb": "node src/tests/verifyVectorStore.js",
+        "verify:golden": "node src/tests/runGoldenTests.js"
     },
     "keywords": [],
     "author": "",
@@ -16,6 +18,9 @@
     "description": "",
     "dependencies": {
         "@google/genai": "^1.34.0",
+        "@langchain/core": "^1.2.3",
+        "@langchain/google-genai": "^2.2.0",
+        "@langchain/langgraph": "^1.4.8",
         "compression": "^1.8.1",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",
