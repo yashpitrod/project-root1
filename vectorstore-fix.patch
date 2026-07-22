@@ -1,0 +1,226 @@
+diff --git a/server/src/models/EmbeddingCache.js b/server/src/models/EmbeddingCache.js
+new file mode 100644
+index 0000000..685db9d
+--- /dev/null
++++ b/server/src/models/EmbeddingCache.js
+@@ -0,0 +1,28 @@
++import mongoose from "mongoose";
++
++// KB-02: Persists embeddings across restarts/redeploys so buildVectorStores()
++// doesn't re-embed unchanged KB content every time the server boots. Render's
++// filesystem is ephemeral on redeploy, but MongoDB is not — so we cache here
++// instead of on disk.
++const embeddingCacheSchema = new mongoose.Schema(
++  {
++    // SHA256 of `${model}:${text}` — uniquely identifies a (model, content) pair.
++    hash: {
++      type: String,
++      required: true,
++      unique: true,
++      index: true,
++    },
++    model: {
++      type: String,
++      required: true,
++    },
++    embedding: {
++      type: [Number],
++      required: true,
++    },
++  },
++  { timestamps: true }
++);
++
++export default mongoose.model("EmbeddingCache", embeddingCacheSchema);
+diff --git a/server/src/services/vectorStore.js b/server/src/services/vectorStore.js
+index 2840a73..79ae26c 100644
+--- a/server/src/services/vectorStore.js
++++ b/server/src/services/vectorStore.js
+@@ -14,9 +14,11 @@
+ 
+ import fs from "fs/promises";
+ import path from "path";
++import crypto from "crypto";
+ import { fileURLToPath } from "url";
+ import { GoogleGenAI } from "@google/genai";
+ import { splitMarkdownByHeaders } from "./markdownSplitter.js";
++import EmbeddingCache from "../models/EmbeddingCache.js";
+ 
+ const __filename = fileURLToPath(import.meta.url);
+ const __dirname = path.dirname(__filename);
+@@ -69,29 +71,81 @@ async function embedText(text) {
+ }
+ 
+ /**
+- * Embed a batch of texts with a small delay between calls to respect rate limits.
++ * Compute the cache key for a given (model, text) pair.
++ * @param {string} text
++ * @returns {string}
++ */
++function hashChunk(text) {
++  return crypto.createHash("sha256").update(`${EMBEDDING_MODEL}:${text}`).digest("hex");
++}
++
++/**
++ * Embed a list of texts, reusing cached embeddings from MongoDB wherever
++ * possible and only calling the Gemini API for chunks that are new or have
++ * changed since the last successful build.
++ *
++ * KB-02: Writes each successful embedding to the cache immediately (not in a
++ * bulk write at the end) so that a mid-run restart/redeploy only loses the
++ * one in-flight chunk, not everything embedded before it.
++ *
++ * Note: gemini-embedding-001 on the free Developer API does not support
++ * batching multiple texts into a single embedContent call — each request
++ * embeds exactly one string — so we still make one HTTP call per uncached
++ * chunk, just never a repeat one across restarts.
++ *
+  * @param {string[]} texts
+- * @param {number} delayMs - Delay between calls in ms (default 200ms)
++ * @param {number} delayMs - Delay between live API calls in ms
+  * @returns {Promise<number[][]>}
+  */
+-async function embedBatch(texts, delayMs = 1500) {
+-  const embeddings = [];
++async function embedChunksWithCache(texts, delayMs = 1500) {
++  const hashes = texts.map(hashChunk);
++
++  // Bulk-check the cache once instead of one query per chunk.
++  const cached = await EmbeddingCache.find({ hash: { $in: hashes } }).lean();
++  const cacheByHash = new Map(cached.map(doc => [doc.hash, doc.embedding]));
++
++  const embeddings = new Array(texts.length).fill(null);
++  let cacheHits = 0;
++  let firstLiveCall = true;
++
+   for (let i = 0; i < texts.length; i++) {
+-    if (i > 0) await sleep(delayMs);
++    const hash = hashes[i];
++    const existing = cacheByHash.get(hash);
++    if (existing) {
++      embeddings[i] = existing;
++      cacheHits++;
++      continue;
++    }
++
++    // Only throttle between *live* API calls — cache hits are free and instant.
++    if (!firstLiveCall) await sleep(delayMs);
++    firstLiveCall = false;
++
+     let success = false;
+     let attempts = 0;
+     while (!success && attempts < 4) {
+       try {
+         const emb = await embedText(texts[i]);
+-        embeddings.push(emb);
++        embeddings[i] = emb;
+         success = true;
++
++        // Persist immediately so this chunk survives a restart even if a
++        // later chunk in this same run fails or the process is killed.
++        try {
++          await EmbeddingCache.updateOne(
++            { hash },
++            { $set: { hash, model: EMBEDDING_MODEL, embedding: emb } },
++            { upsert: true }
++          );
++        } catch (cacheErr) {
++          console.warn(`[VectorStore] Failed to persist cache entry for chunk ${i}: ${cacheErr.message}`);
++        }
+       } catch (err) {
+         attempts++;
+-        const retryDelayMs = getRetryDelayMs(err) || 5000 * attempts;
++        const retryDelayMs = getRetryDelayMs(err) ?? 5000 * attempts;
+         if (attempts >= 4) {
+           console.error(`Embedding failed for chunk ${i} after 4 attempts: ${err.message}`);
+-          // Push null — filtered out during indexing
+-          embeddings.push(null);
++          // Leave as null — filtered out during indexing
+         } else {
+           console.warn(`Embedding failed for chunk ${i} (attempt ${attempts}): ${err.message}. Retrying in ${Math.round(retryDelayMs / 1000)}s...`);
+           await sleep(retryDelayMs);
+@@ -99,6 +153,11 @@ async function embedBatch(texts, delayMs = 1500) {
+       }
+     }
+   }
++
++  if (cacheHits > 0) {
++    console.log(`[VectorStore] Reused ${cacheHits}/${texts.length} embeddings from cache.`);
++  }
++
+   return embeddings;
+ }
+ 
+@@ -106,17 +165,51 @@ function sleep(ms) {
+   return new Promise(resolve => setTimeout(resolve, ms));
+ }
+ 
++/**
++ * Extract the server-specified retry delay (in ms) from a Gemini SDK ApiError.
++ *
++ * The @google/genai SDK's ApiError only exposes `message` and `status` — there
++ * is no `.details` property. The full JSON error body (including the
++ * RetryInfo with the actual retryDelay) is embedded as a *string* inside
++ * `error.message`, so it has to be parsed out rather than read off the object.
++ *
++ * The previous regex (`/(?:(\d+)s)|(?:(\d+)ms)/`) also only matched
++ * integer seconds, but the API returns fractional values like
++ * "24.919247084s". That caused the regex to match a suffix of the digits
++ * (e.g. "919247084") as a millisecond value instead — effectively a random
++ * ~29-year delay — so the match "succeeded" but produced garbage, and the
++ * intended fixed-backoff fallback never kicked in either.
++ *
++ * @param {Error} error
++ * @returns {number|null} delay in milliseconds, or null if not present/parseable
++ */
+ function getRetryDelayMs(error) {
+-  if (!error || !error.details) return null;
+-  const retryInfo = error.details.find(detail => detail["@type"]?.includes("RetryInfo"));
+-  if (retryInfo?.retryDelay) {
+-    const match = /(?:(\d+)s)|(?:(\d+)ms)/.exec(retryInfo.retryDelay);
+-    if (match) {
+-      if (match[1]) return Number(match[1]) * 1000;
+-      if (match[2]) return Number(match[2]);
+-    }
++  if (!error || typeof error.message !== "string") return null;
++
++  try {
++    // error.message is the raw response body serialized as JSON text, e.g.
++    // {"error":{"code":429,...,"details":[...,{"@type":"...RetryInfo","retryDelay":"24.9s"}]}}
++    const parsed = JSON.parse(error.message);
++    const details = parsed?.error?.details;
++    if (!Array.isArray(details)) return null;
++
++    const retryInfo = details.find(detail => detail["@type"]?.includes("RetryInfo"));
++    const retryDelay = retryInfo?.retryDelay;
++    if (typeof retryDelay !== "string") return null;
++
++    // Match decimal seconds ("24.919247084s") or decimal milliseconds ("500ms").
++    const match = /^(\d+(?:\.\d+)?)(ms|s)$/.exec(retryDelay.trim());
++    if (!match) return null;
++
++    const value = Number(match[1]);
++    if (Number.isNaN(value)) return null;
++
++    return match[2] === "s" ? Math.ceil(value * 1000) : Math.ceil(value);
++  } catch {
++    // error.message wasn't JSON (e.g. a network error, not a 429) — fall
++    // back to the caller's fixed exponential backoff.
++    return null;
+   }
+-  return null;
+ }
+ 
+ // ── Cosine similarity ────────────────────────────────────────────────────────
+@@ -185,9 +278,9 @@ async function indexDirectory(dirPath, sourceType) {
+ 
+   console.log(`[VectorStore] ${sourceType}: ${allChunks.length} chunks from ${files.length} files. Embedding...`);
+ 
+-  // Embed all chunks
++  // Embed all chunks (cache-aware — only uncached/changed chunks hit the API)
+   const texts = allChunks.map(c => c.text);
+-  const embeddings = await embedBatch(texts, 1000); // 1000ms between calls
++  const embeddings = await embedChunksWithCache(texts, 1000); // 1000ms between live calls
+ 
+   // Merge embeddings with chunk metadata, skip failed embeddings
+   const indexed = [];
