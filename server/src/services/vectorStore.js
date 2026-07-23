@@ -9,14 +9,14 @@
  *   - campusStore   → for campus-policy/FAQ queries
  *
  * Built at server startup from the markdown KB files.
- * Embeddings use Google's gemini-embedding-001 model via @google/genai.
+ * Embeddings use a deterministic local token embedding so the knowledge base
+ * does not require a second provider account.
  */
 
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import { GoogleGenAI } from "@google/genai";
 import { splitMarkdownByHeaders } from "./markdownSplitter.js";
 import EmbeddingCache from "../models/EmbeddingCache.js";
 
@@ -27,20 +27,10 @@ const __dirname = path.dirname(__filename);
 const MEDICAL_KB_DIR = path.resolve(__dirname, "../knowledge-base/medical");
 const CAMPUS_KB_DIR = path.resolve(__dirname, "../knowledge-base/campus");
 
-// ── Gemini client (reuses GEMINI_API_KEY from env) ─────────────────────────
-const geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 // ── Embedding provider configuration ───────────────────────────────────────
-// Groq has no embeddings model in its public catalog — Gemini is the only
-// supported provider now. Keeping this simple avoids a dead-end fallback.
-const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const EMBEDDING_MODEL = "local-token-hash-v1";
 
-if (!GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is required to build embeddings.");
-}
-
-console.log(`[VectorStore] Gemini embedding model: ${EMBEDDING_MODEL}`);
+console.log(`[VectorStore] Embedding provider: ${EMBEDDING_MODEL}`);
 
 // ── In-memory stores ────────────────────────────────────────────────────────
 /**
@@ -58,16 +48,22 @@ let initialized = false;
  * @returns {Promise<number[]>}
  */
 async function embedText(text) {
-  const response = await geminiClient.models.embedContent({
-    model: EMBEDDING_MODEL,
-    contents: text,
-  });
+  return localEmbedding(text);
+}
 
-  const values = response?.embeddings?.[0]?.values;
-  if (!values || values.length === 0) {
-    throw new Error(`Empty embedding returned for text: "${text.slice(0, 60)}..."`);
+const LOCAL_EMBEDDING_DIMENSIONS = 384;
+
+function localEmbedding(text) {
+  const vector = new Array(LOCAL_EMBEDDING_DIMENSIONS).fill(0);
+  const tokens = text.toLowerCase().match(/[a-z0-9]+/g) || [];
+
+  for (const token of tokens) {
+    const digest = crypto.createHash("sha256").update(token).digest();
+    const index = digest.readUInt32BE(0) % LOCAL_EMBEDDING_DIMENSIONS;
+    vector[index] += digest[4] % 2 === 0 ? 1 : -1;
   }
-  return values;
+
+  return vector;
 }
 
 /**
@@ -88,10 +84,8 @@ function hashChunk(text) {
  * bulk write at the end) so that a mid-run restart/redeploy only loses the
  * one in-flight chunk, not everything embedded before it.
  *
- * Note: gemini-embedding-001 on the free Developer API does not support
- * batching multiple texts into a single embedContent call — each request
- * embeds exactly one string — so we still make one HTTP call per uncached
- * chunk, just never a repeat one across restarts.
+ * Local embeddings are computed synchronously per uncached chunk, while the
+ * cache still prevents repeat work across restarts.
  *
  * @param {string[]} texts
  * @param {number} delayMs - Delay between live API calls in ms
@@ -166,12 +160,11 @@ function sleep(ms) {
 }
 
 /**
- * Extract the server-specified retry delay (in ms) from a Gemini SDK ApiError.
+ * Extract a server-specified retry delay (in ms) from a provider error.
  *
- * The @google/genai SDK's ApiError only exposes `message` and `status` — there
- * is no `.details` property. The full JSON error body (including the
- * RetryInfo with the actual retryDelay) is embedded as a *string* inside
- * `error.message`, so it has to be parsed out rather than read off the object.
+ * Some providers expose the full JSON error body as a string inside
+ * `error.message`, so parse it when available rather than relying on a
+ * provider-specific error shape.
  *
  * The previous regex (`/(?:(\d+)s)|(?:(\d+)ms)/`) also only matched
  * integer seconds, but the API returns fractional values like

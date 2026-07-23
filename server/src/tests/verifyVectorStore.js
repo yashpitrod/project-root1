@@ -12,7 +12,7 @@
  * Usage:
  *   node server/src/tests/verifyVectorStore.js
  *
- * Requires GEMINI_API_KEY to be set in environment.
+ * Uses local deterministic embeddings and does not require an AI API key.
  */
 
 import "dotenv/config";

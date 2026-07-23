@@ -1,13 +1,14 @@
-import { GoogleGenAI } from "@google/genai";
+import { ChatGroq } from "@langchain/groq";
 
 // GM-04: Guard against missing API key at startup
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY environment variable is not set");
+if (!process.env.GROQ_API_KEY) {
+  throw new Error("GROQ_API_KEY environment variable is not set");
 }
 
-// Single Gemini client instance for the entire server
-const client = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+const llm = new ChatGroq({
+  model: "llama-3.1-8b-instant",
+  apiKey: process.env.GROQ_API_KEY,
+  maxRetries: 3,
 });
 
 /**
@@ -18,30 +19,19 @@ const client = new GoogleGenAI({
 export const translateToEnglish = async (text) => {
   try {
     const response = await Promise.race([
-      client.models.generateContent({
-        model: process.env.GEMINI_CHAT_MODEL || "gemini-1.5-flash",
-        contents: [{
-          role: "user",
-          parts: [{
-            text: `Translate the following text into English. Return ONLY the translated English text.\n\nText:\n${text}`,
-          }],
-        }],
-      }),
+      llm.invoke(`Translate the following text into English. Return ONLY the translated English text.\n\nText:\n${text}`),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 10000)
       )
     ]);
 
-    // GM-01: response.text is a getter that can return undefined — guard against it
-    const translated = response.text;
+    const translated = response?.content;
     if (!translated) {
-      throw new Error("Gemini returned empty response");
+      throw new Error("Groq returned empty response");
     }
     return translated.trim();
   } catch (error) {
-    console.error("Gemini translation error:", error.status, error.message);
+    console.error("Groq translation error:", error.status, error.message);
     throw new Error("Translation failed");
   }
 };
-
-export default client;

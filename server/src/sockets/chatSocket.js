@@ -2,21 +2,14 @@ import ChatSession from "../models/ChatSession.js";
 import { triageGraph } from "../agents/triageGraph.js";
 import { classifyIntent } from "../agents/intentClassifier.js";
 import { searchCampus } from "../services/vectorStore.js"; // For FAQ
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatGroq } from "@langchain/groq";
 
-const primaryModel = new ChatGoogleGenerativeAI({
-  model: process.env.GEMINI_CHAT_MODEL || "gemini-1.5-flash",
-  apiKey: process.env.GEMINI_API_KEY,
+const llm = new ChatGroq({
+  model: "llama-3.1-8b-instant",
+  apiKey: process.env.GROQ_API_KEY,
   maxRetries: 3,
   temperature: 0.3,
 });
-const fallbackModel = new ChatGoogleGenerativeAI({
-  model: "gemini-1.5-flash-8b",
-  apiKey: process.env.GEMINI_API_KEY,
-  maxRetries: 3,
-  temperature: 0.3,
-});
-const llm = primaryModel.withFallbacks({ fallbacks: [fallbackModel] });
 
 // ERR-01: Error classification for recoverable vs fatal errors.
 // Transient errors (Gemini timeout, rate limit, network) get recoverable: true.

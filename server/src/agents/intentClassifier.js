@@ -1,19 +1,12 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatGroq } from "@langchain/groq";
 
 // Initialize Gemini flash for fast intent classification
-const primaryModel = new ChatGoogleGenerativeAI({
-  model: process.env.GEMINI_CHAT_MODEL || "gemini-1.5-flash",
-  apiKey: process.env.GEMINI_API_KEY,
+const llm = new ChatGroq({
+  model: "llama-3.1-8b-instant",
+  apiKey: process.env.GROQ_API_KEY,
   maxRetries: 3,
   temperature: 0,
 });
-const fallbackModel = new ChatGoogleGenerativeAI({
-  model: "gemini-1.5-flash-8b",
-  apiKey: process.env.GEMINI_API_KEY,
-  maxRetries: 3,
-  temperature: 0,
-});
-const llm = primaryModel.withFallbacks({ fallbacks: [fallbackModel] });
 
 /**
  * Classifies the initial user message to determine if it's a medical triage or a campus FAQ.
