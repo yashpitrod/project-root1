@@ -71,7 +71,7 @@ const syncUserFromFirebase = async ({ uid, email, name, provider = "firebase", r
           emailVerified: true,
         },
       },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     ).lean();
 
     return serializeUser(updated);
@@ -82,7 +82,7 @@ const syncUserFromFirebase = async ({ uid, email, name, provider = "firebase", r
       const updated = await User.findOneAndUpdate(
         { email: normalizedEmail },
         { $set: { uid, provider, lastLoginAt: new Date(), emailVerified: true } },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
       ).lean();
       return serializeUser(updated);
     }
@@ -108,7 +108,7 @@ const syncUserFromFirebase = async ({ uid, email, name, provider = "firebase", r
           emailVerified: true,
         },
       },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     ).lean();
 
     return serializeUser(updated);

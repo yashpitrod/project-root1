@@ -2,7 +2,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 // Initialize Gemini flash for fast intent classification
 const llm = new ChatGoogleGenerativeAI({
-  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.1",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
   temperature: 0,

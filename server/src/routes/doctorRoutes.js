@@ -50,7 +50,7 @@ router.put("/status", verifyToken, async (req, res) => {
     const doctor = await User.findByIdAndUpdate(
       doctorId,
       { availability },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!doctor) {

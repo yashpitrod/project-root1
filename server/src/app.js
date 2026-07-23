@@ -13,6 +13,8 @@ import doctorRoutes from "./routes/doctorRoutes.js";
 const app = express();
 
 app.disable("x-powered-by");
+// Render forwards the original client IP in X-Forwarded-For.
+app.set("trust proxy", 1);
 
 // EX-01: Helmet — sets security headers (CSP, HSTS, X-Frame-Options, hides X-Powered-By)
 // Disabling CSP since this is a pure JSON API and serves no HTML
