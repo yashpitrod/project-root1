@@ -1,11 +1,18 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
-const llm = new ChatGoogleGenerativeAI({
-  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.0-flash",
+const primaryModel = new ChatGoogleGenerativeAI({
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-1.5-flash",
   apiKey: process.env.GEMINI_API_KEY,
-  maxRetries: 5,
+  maxRetries: 3,
   temperature: 0,
 });
+const fallbackModel = new ChatGoogleGenerativeAI({
+  model: "gemini-1.5-flash-8b",
+  apiKey: process.env.GEMINI_API_KEY,
+  maxRetries: 3,
+  temperature: 0,
+});
+const llm = primaryModel.withFallbacks({ fallbacks: [fallbackModel] });
 
 /**
  * ExtractionNode

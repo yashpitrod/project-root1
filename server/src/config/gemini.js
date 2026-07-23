@@ -19,7 +19,7 @@ export const translateToEnglish = async (text) => {
   try {
     const response = await Promise.race([
       client.models.generateContent({
-        model: process.env.GEMINI_CHAT_MODEL || "gemini-2.0-flash",
+        model: process.env.GEMINI_CHAT_MODEL || "gemini-1.5-flash",
         contents: [{
           role: "user",
           parts: [{
