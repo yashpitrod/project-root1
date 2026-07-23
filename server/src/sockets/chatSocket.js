@@ -5,7 +5,7 @@ import { searchCampus } from "../services/vectorStore.js"; // For FAQ
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 const llm = new ChatGoogleGenerativeAI({
-  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash-lite",
+  model: process.env.GEMINI_CHAT_MODEL || "gemini-2.0-flash",
   apiKey: process.env.GEMINI_API_KEY,
   maxRetries: 5,
   temperature: 0.3,
