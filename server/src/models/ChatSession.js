@@ -31,11 +31,10 @@ const chatSessionSchema = new mongoose.Schema(
 );
 
 // Pre-save hook to set expiresAt to 24 hours from now if not already set
-chatSessionSchema.pre("save", function (next) {
+chatSessionSchema.pre("save", function () {
   if (!this.expiresAt) {
     this.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   }
-  next();
 });
 
 const ChatSession = mongoose.model("ChatSession", chatSessionSchema);
