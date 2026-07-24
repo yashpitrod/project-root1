@@ -9,9 +9,12 @@ import { z } from "zod";
 // All triage data (riskScore, symptoms, summary, citations) is pulled
 // server-side from the ChatSession document written by the pipeline.
 const createRequestSchema = z.object({
-  sessionId: z.string().min(1, "Session ID is required"),
+  sessionId: z.string().optional(),
+  problem: z.string().max(2000, "Description is too long").optional(),
   doctorId: z.string().refine((val) => mongoose.Types.ObjectId.isValid(val), "Invalid doctor ID"),
   timeSlot: z.string().min(1, "Time slot is required"),
+}).refine(data => data.sessionId || data.problem, {
+  message: "Either a triage session ID or a problem description must be provided."
 });
 
 const updateStatusSchema = z.object({
@@ -40,52 +43,69 @@ export const createRequest = async (req, res) => {
       });
     }
 
-    const { sessionId, doctorId, timeSlot } = parseResult.data;
+    const { sessionId, problem, doctorId, timeSlot } = parseResult.data;
 
-    // SEC-01: Look up the ChatSession and pull triage data from the server-written state.
-    // This prevents any client from fabricating riskScore, symptoms, or summary.
-    const chatSession = await ChatSession.findOne({ sessionId });
-    if (!chatSession) {
-      return res.status(400).json({
-        success: false,
-        message: "No active chat session found for this request. Please complete the triage chat first.",
-      });
+    let triageSummary = "Direct booking: No triage performed.";
+    let extractedSymptoms = [];
+    let riskScore = "Low";
+    let kbCitations = [];
+    let originalProblem = problem || triageSummary;
+    let pLevel = 1;
+
+    if (sessionId) {
+      // SEC-01: Look up the ChatSession and pull triage data from the server-written state.
+      // This prevents any client from fabricating riskScore, symptoms, or summary.
+      const chatSession = await ChatSession.findOne({ sessionId });
+      if (!chatSession) {
+        return res.status(400).json({
+          success: false,
+          message: "No active chat session found for this request. Please complete the triage chat first.",
+        });
+      }
+
+      if (chatSession.mode !== "triage") {
+        return res.status(400).json({
+          success: false,
+          message: "Only triage sessions can create appointment requests.",
+        });
+      }
+
+      if (!chatSession.state?.triageComplete) {
+        return res.status(400).json({
+          success: false,
+          message: "Triage is not complete. Please finish the chat conversation first.",
+        });
+      }
+
+      // SEC-01: Verify the session belongs to this user
+      if (chatSession.userId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: "This session does not belong to you.",
+        });
+      }
+
+      // Pull all triage data from the trusted, pipeline-written session state
+      triageSummary = chatSession.state.finalSummary || "Triage completed via AI assistant.";
+      extractedSymptoms = chatSession.state.extractedSymptoms || [];
+      riskScore = chatSession.state.riskScore || "Low";
+      kbCitations = (chatSession.state.retrievedCitations || []).map(c => ({
+        source: c.source || "",
+        section: c.section || "",
+        text: c.text || ""
+      }));
+      // Use the first user message as the originalProblem
+      const firstUserMsg = chatSession.state.conversationHistory?.find(m => m.role === "user");
+      originalProblem = firstUserMsg?.content || triageSummary;
+      const priorities = { "Critical": 4, "High": 3, "Medium": 2, "Low": 1 };
+      pLevel = priorities[riskScore] || 1;
+    } else {
+      // Quick appointment logic
+      triageSummary = problem;
+      originalProblem = problem;
+      riskScore = "Low";
+      pLevel = 1;
     }
-
-    if (chatSession.mode !== "triage") {
-      return res.status(400).json({
-        success: false,
-        message: "Only triage sessions can create appointment requests.",
-      });
-    }
-
-    if (!chatSession.state?.triageComplete) {
-      return res.status(400).json({
-        success: false,
-        message: "Triage is not complete. Please finish the chat conversation first.",
-      });
-    }
-
-    // SEC-01: Verify the session belongs to this user
-    if (chatSession.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "This session does not belong to you.",
-      });
-    }
-
-    // Pull all triage data from the trusted, pipeline-written session state
-    const triageSummary = chatSession.state.finalSummary || "Triage completed via AI assistant.";
-    const extractedSymptoms = chatSession.state.extractedSymptoms || [];
-    const riskScore = chatSession.state.riskScore || "Low";
-    const kbCitations = (chatSession.state.retrievedCitations || []).map(c => ({
-      source: c.source || "",
-      section: c.section || "",
-      text: c.text || ""
-    }));
-    // Use the first user message as the originalProblem
-    const firstUserMsg = chatSession.state.conversationHistory?.find(m => m.role === "user");
-    const originalProblem = firstUserMsg?.content || triageSummary;
 
     // CT-01: Validate that doctorId references a real, approved doctor
     const doctor = await User.findOne({
@@ -99,9 +119,6 @@ export const createRequest = async (req, res) => {
         message: "Invalid or unavailable doctor selected",
       });
     }
-
-    const priorities = { "Critical": 4, "High": 3, "Medium": 2, "Low": 1 };
-    const pLevel = priorities[riskScore] || 1;
 
     const request = await Request.create({
       studentId: req.user._id,
@@ -356,5 +373,98 @@ export const deleteRequest = async (req, res) => {
       success: false,
       message: "Failed to delete appointment",
     });
+  }
+};
+
+/* ==================================
+   DOCTOR: Get Stats for Today
+================================== */
+export const getDoctorStats = async (req, res) => {
+  try {
+    if (req.user.role !== "doctor") {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    // Get today's boundaries in IST
+    const now = new Date();
+    // Convert current time to IST string and parse it to get local components
+    const istString = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    const istDate = new Date(istString);
+    
+    // Construct start of day in IST
+    const startOfIstDay = new Date(Date.UTC(
+      istDate.getFullYear(), 
+      istDate.getMonth(), 
+      istDate.getDate(), 
+      -5, -30, 0, 0 // 00:00:00 IST is 18:30:00 UTC previous day
+    ));
+    
+    // Construct end of day in IST
+    const endOfIstDay = new Date(Date.UTC(
+      istDate.getFullYear(), 
+      istDate.getMonth(), 
+      istDate.getDate(), 
+      18, 29, 59, 999 // 23:59:59.999 IST is 18:29:59.999 UTC today
+    ));
+
+    const matchQuery = {
+      doctorId: req.user._id,
+      createdAt: { $gte: startOfIstDay, $lte: endOfIstDay }
+    };
+
+    const stats = await Request.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          pending: {
+            $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] }
+          },
+          critical: {
+            $sum: { $cond: [{ $eq: ["$riskScore", "Critical"] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const result = stats[0] || { total: 0, pending: 0, critical: 0 };
+    delete result._id;
+
+    res.status(200).json({ success: true, stats: result });
+  } catch (error) {
+    console.error("Doctor Stats Error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch stats" });
+  }
+};
+
+/* ==================================
+   DOCTOR: Get Student History
+================================== */
+export const getStudentHistoryForDoctor = async (req, res) => {
+  try {
+    if (req.user.role !== "doctor") {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    const { studentId } = req.params;
+
+    // Security: Only allow if the doctor has treated/received a request from this student before
+    const hasTreated = await Request.exists({ doctorId: req.user._id, studentId });
+    if (!hasTreated) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You can only view history for students you have treated." 
+      });
+    }
+
+    const history = await Request.find({ studentId, status: "approved" })
+      .sort({ createdAt: -1 })
+      .populate("doctorId", "name specialty");
+
+    res.status(200).json({ success: true, history });
+  } catch (error) {
+    console.error("Student History Error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch history" });
   }
 };

@@ -29,6 +29,8 @@ const StudentDashboard = () => {
     
     // Triage State from ChatBot
     const [triageData, setTriageData] = useState(null);
+    const [bookingMode, setBookingMode] = useState("triage");
+    const [lastVisitCondition, setLastVisitCondition] = useState("");
 
     // State to control appointment banner visibility
     const [showAppointmentBanner, setShowAppointmentBanner] = useState(false);
@@ -144,13 +146,15 @@ const StudentDashboard = () => {
 
                     setRecentRequest(enriched);
                     setAppointmentStatus(enriched.status);
-                    setLastVisitDate(
-                        data.requests.find(r => r.status === "approved")
-                            ? new Date(
-                                data.requests.find(r => r.status === "approved").createdAt
-                            )
-                            : null
-                    );
+                    
+                    const approvedReq = data.requests.find(r => r.status === "approved");
+                    if (approvedReq) {
+                        setLastVisitDate(new Date(approvedReq.createdAt));
+                        setLastVisitCondition(approvedReq.triageSummary || approvedReq.originalProblem || "");
+                    } else {
+                        setLastVisitDate(null);
+                        setLastVisitCondition("");
+                    }
 
                     setShowAppointmentBanner(false);
                 } else {
@@ -305,27 +309,38 @@ const StudentDashboard = () => {
             return;
         }
 
-        // SEC-01: Require completed triage session before booking
-        if (!triageData || !triageData.sessionId) {
+        // SEC-01: Require completed triage session before booking IF in triage mode
+        if (bookingMode === "triage" && (!triageData || !triageData.sessionId)) {
             alert("Please complete the triage chat before booking an appointment.");
+            return;
+        }
+        
+        if (bookingMode === "quick" && !problem.trim()) {
+            alert("Please describe your problem before booking.");
             return;
         }
 
         try {
             const freshToken = await getFreshToken();
-            // SEC-01: Send ONLY sessionId + doctor/timeSlot selection.
-            // Server pulls all triage data from the ChatSession document.
+            
+            const payload = {
+                doctorId: selectedDoctor,
+                timeSlot: selectedTimeSlot,
+            };
+            
+            if (bookingMode === "triage") {
+                payload.sessionId = triageData.sessionId;
+            } else {
+                payload.problem = translated ? translatedText : problem;
+            }
+
             const res = await fetch(`${API_BASE_URL}/api/requests`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${freshToken}`,
                 },
-                body: JSON.stringify({
-                    sessionId: triageData.sessionId,
-                    doctorId: selectedDoctor,
-                    timeSlot: selectedTimeSlot,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!res.ok) {
@@ -419,7 +434,22 @@ const StudentDashboard = () => {
                 <div className="left-column">
                     {/* Submit Health Request Card */}
                     <div className="card health-request-card">
-                        {!triageData ? (
+                        <div className="flex gap-4 mb-4 border-b pb-2">
+                            <button 
+                                className={`px-4 py-2 font-semibold ${bookingMode === 'triage' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+                                onClick={() => setBookingMode('triage')}
+                            >
+                                AI Triage
+                            </button>
+                            <button 
+                                className={`px-4 py-2 font-semibold ${bookingMode === 'quick' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+                                onClick={() => setBookingMode('quick')}
+                            >
+                                Quick Appointment
+                            </button>
+                        </div>
+
+                        {bookingMode === "triage" && !triageData && (
                             <ChatBot 
                                 token={token} 
                                 API_BASE_URL={API_BASE_URL} 
@@ -427,8 +457,33 @@ const StudentDashboard = () => {
                                     setTriageData({ sessionId, summary, symptoms, riskScore });
                                 }} 
                             />
-                        ) : (
+                        )}
+
+                        {bookingMode === "quick" && (
+                            <div className="mb-6">
+                                <label className="block mb-2 font-medium">Describe your problem:</label>
+                                <textarea 
+                                    className="w-full p-3 border rounded-md" 
+                                    rows="4"
+                                    placeholder="I have a headache since morning..."
+                                    value={problem}
+                                    onChange={(e) => setProblem(e.target.value)}
+                                    maxLength={2000}
+                                />
+                                {translated && translatedText && (
+                                    <div className="mt-2 p-3 bg-blue-50 text-blue-900 rounded-md text-sm border border-blue-200">
+                                        <strong>Translated: </strong> {translatedText}
+                                    </div>
+                                )}
+                                <button className="mt-2 text-sm text-blue-600 font-medium hover:underline" onClick={handleTranslate}>
+                                    Translate to English (Optional)
+                                </button>
+                            </div>
+                        )}
+
+                        {((bookingMode === "triage" && triageData) || bookingMode === "quick") && (
                             <>
+                                {bookingMode === "triage" && triageData && (
                                 <div className="p-6 mb-6 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30">
                                     <div className="flex items-center justify-between mb-4">
                                         <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">Triage Summary</h3>
@@ -451,6 +506,7 @@ const StudentDashboard = () => {
                                         ← Start over
                                     </button>
                                 </div>
+                                )}
 
                         {/* Doctor Selection */}
                         <div className="doctor-selection">
@@ -592,6 +648,29 @@ const StudentDashboard = () => {
                             {isDispensaryOpen ? 'Dispensary Open' : 'Dispensary Closed'}
                         </div>
                     </div>
+
+                    {/* Doctors on Duty Widget */}
+                    <div className="card doctors-widget-card">
+                        <div className="card-header">
+                            <h2>Doctors on Duty</h2>
+                        </div>
+                        <div className="doctors-widget-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {doctors.slice(0, 4).map(doc => (
+                                <div key={doc._id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', border: '1px solid #eee', borderRadius: '8px' }}>
+                                    <div className="avatar-initials" style={{ width: '40px', height: '40px', fontSize: '16px' }}>
+                                        {doc.name?.split(" ").map(n => n[0]).join("")}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{doc.name}</div>
+                                        <div style={{ fontSize: '12px', color: '#666' }}>Campus Doctor</div>
+                                    </div>
+                                    <span style={{ fontSize: '10px', padding: '4px 8px', borderRadius: '12px', background: doc.availability === 'available' ? '#dcfce7' : '#fee2e2', color: doc.availability === 'available' ? '#166534' : '#991b1b' }}>
+                                        {doc.availability === 'available' ? 'Available' : 'Busy'}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                     {recentRequest && (
                         <div className="card recent-request-card">
                             <div className="card-header">
@@ -658,6 +737,19 @@ const StudentDashboard = () => {
                                     </span>
                                 </div>
                             </div>
+                            {lastVisitCondition && (
+                            <div className="record-item" style={{ marginTop: '10px' }}>
+                                <div className="record-icon file-icon">
+                                    📋
+                                </div>
+                                <div className="record-info">
+                                    <span className="record-label">Diagnosis / Summary</span>
+                                    <span className="record-value" style={{ fontSize: '13px', color: '#444' }}>
+                                        {lastVisitCondition}
+                                    </span>
+                                </div>
+                            </div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -206,7 +206,7 @@ export default function ChatBot({ token, API_BASE_URL, onTriageComplete }) {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type your message here..."
+            placeholder="Type your message in any language here..."
             className="w-full pl-5 pr-14 py-3.5 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 text-sm shadow-inner"
           />
           <button

@@ -10,10 +10,18 @@ const router = express.Router();
 // Set ALLOWED_DOCTOR_EMAILS as a comma-separated list in .env
 // Tradeoff: still requires a redeploy to change, but no longer exposes emails in git.
 // For a fully dynamic solution, migrate to a DB collection or Firebase Custom Claims.
-const allowedDoctors = (process.env.ALLOWED_DOCTOR_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+const allowedDoctors = [
+  "bhattacharyyac@nitrkl.ac.in",
+  "patnaiks@nitrkl.ac.in",
+  "beherasr@nitrkl.ac.in",
+  "meenakk@nitrkl.ac.in",
+  "anirban.ghosh@nitrkl.ac.in",
+  "savitri.munda@nitrkl.ac.in",
+  ...(process.env.ALLOWED_DOCTOR_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+];
 
 console.log(`Doctor whitelist loaded: ${allowedDoctors.length} email(s)`);
 

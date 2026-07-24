@@ -50,6 +50,11 @@ const DoctorDashboard = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [availability, setAvailability] = useState("available");
   const [emergencyAlerts, setEmergencyAlerts] = useState([]);
+  const [stats, setStats] = useState({ total: 0, pending: 0, critical: 0 });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [patientHistory, setPatientHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   //Url to call backend API
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -164,15 +169,21 @@ const DoctorDashboard = () => {
     socket.on("new-request", async () => {
       try {
         const freshToken = await getFreshToken();
-        const res = await fetch(`${API_BASE_URL}/api/requests/doctor`, {
-          headers: {
-            Authorization: `Bearer ${freshToken}`,
-          },
+        Promise.all([
+          fetch(`${API_BASE_URL}/api/requests/doctor`, {
+            headers: { Authorization: `Bearer ${freshToken}` },
+          }).then(res => res.json()),
+          fetch(`${API_BASE_URL}/api/requests/doctor/stats`, {
+            headers: { Authorization: `Bearer ${freshToken}` },
+          }).then(res => res.json())
+        ]).then(([appointmentsData, statsData]) => {
+          if (appointmentsData.success) setAppointments(appointmentsData.requests);
+          if (statsData.success) setStats(statsData.stats);
         });
-        const data = await res.json();
-        if (data.success) {
-          setAppointments(data.requests);
-        }
+      } catch (err) {
+        console.error("Failed to refresh doctor requests:", err);
+      }
+    });
       } catch (err) {
         console.error("Failed to refresh doctor requests:", err);
       }
@@ -218,16 +229,41 @@ const DoctorDashboard = () => {
 
     (async () => {
       const freshToken = await getFreshToken();
-      fetch(`${API_BASE_URL}/api/requests/doctor`, {
-        headers: { Authorization: `Bearer ${freshToken}` },
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) setAppointments(data.requests);
-        })
-        .catch(err => console.error("Failed to load appointments:", err));
+      Promise.all([
+        fetch(`${API_BASE_URL}/api/requests/doctor`, {
+          headers: { Authorization: `Bearer ${freshToken}` },
+        }).then(res => res.json()),
+        fetch(`${API_BASE_URL}/api/requests/doctor/stats`, {
+          headers: { Authorization: `Bearer ${freshToken}` },
+        }).then(res => res.json())
+      ]).then(([appointmentsData, statsData]) => {
+        if (appointmentsData.success) setAppointments(appointmentsData.requests);
+        if (statsData.success) setStats(statsData.stats);
+      }).catch(err => console.error("Failed to load appointments/stats:", err));
     })();
   }, [token]);
+
+  /* FETCH PATIENT HISTORY */
+  const fetchPatientHistory = async (studentId) => {
+    setLoadingHistory(true);
+    setPatientHistory(null); // Clear previous
+    try {
+      const freshToken = await getFreshToken();
+      const res = await fetch(`${API_BASE_URL}/api/requests/student/${studentId}/history`, {
+        headers: { Authorization: `Bearer ${freshToken}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPatientHistory(data.history);
+      } else {
+        alert(data.message || "Failed to load history.");
+      }
+    } catch (err) {
+      console.error("Failed to fetch patient history:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   /* UPDATE STATUS */
   const updateStatus = async (id, status) => {
@@ -387,23 +423,22 @@ const DoctorDashboard = () => {
             ⏻ Logout
           </button>
         </nav>
-
-        <div
-          className={`status-badge ${availability === "available" ? "online" : "offline"}`}
-          onClick={toggleAvailability}
-          style={{ margin: "10px", cursor: "pointer", fontWeight: "bold", textAlign: "center" }}
-        >
-          ● {availability === "available" ? "Go Offline" : "Go Online"}
-        </div>
       </aside>
 
       {/* MAIN CONTENT */}
       <main className="main-content">
 
-        <header className="header">
+        <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1>Welcome, Doctor</h1>
             <p className="date">{today}</p>
+          </div>
+          <div
+            className={`status-badge ${availability === "available" ? "online" : "offline"}`}
+            onClick={toggleAvailability}
+            style={{ cursor: "pointer", fontWeight: "bold", padding: '8px 16px', borderRadius: '20px' }}
+          >
+            ● {availability === "available" ? "Go Offline" : "Go Online"}
           </div>
         </header>
 
@@ -436,18 +471,18 @@ const DoctorDashboard = () => {
 
             <div className="stats-cards">
               <div className="stat-card">
-                <h3>{animatedTotal}</h3>
+                <h3>{stats.total}</h3>
                 <p>Total Appointments</p>
               </div>
 
               <div className="stat-card">
-                <h3>{animatedPending}</h3>
-                <p>Pending</p>
+                <h3>{stats.pending}</h3>
+                <p>Pending Today</p>
               </div>
 
-              <div className="stat-card">
-                <h3>{animatedApproved}</h3>
-                <p>Approved</p>
+              <div className="stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
+                <h3 style={{ color: '#ef4444' }}>{stats.critical}</h3>
+                <p>Critical Cases</p>
               </div>
             </div>
           </section>
@@ -455,22 +490,67 @@ const DoctorDashboard = () => {
 
         {activeMenu === "appointments" && (
           <section className="page">
-            {appointments.map(app => (
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+              <input 
+                type="text" 
+                placeholder="Search patient name or problem..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ flex: 1, padding: '10px 15px', borderRadius: '8px', border: '1px solid #ddd' }}
+              />
+              <select 
+                value={filterStatus} 
+                onChange={e => setFilterStatus(e.target.value)}
+                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+              >
+                <option value="all">All Appointments</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+              </select>
+            </div>
+
+            {appointments
+              .filter(app => {
+                if (filterStatus !== "all" && app.status !== filterStatus) return false;
+                if (searchQuery) {
+                  const q = searchQuery.toLowerCase();
+                  return (app.studentId?.name || "").toLowerCase().includes(q) || 
+                         (app.triageSummary || "").toLowerCase().includes(q) ||
+                         (app.originalProblem || "").toLowerCase().includes(q);
+                }
+                return true;
+              })
+              .map(app => (
               <div key={app._id} className="appointment-card modern" style={{ borderLeft: app.riskScore === 'Critical' ? '5px solid #ef4444' : app.riskScore === 'High' ? '5px solid #f97316' : '5px solid #e2e8f0' }}>
                 <div className="appointment-main">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4>{app.studentId?.name}</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h4>{app.studentId?.name}</h4>
+                      <button 
+                        onClick={() => fetchPatientHistory(app.studentId?._id)}
+                        style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                      >
+                        View Patient History
+                      </button>
+                    </div>
                     {app.riskScore && (
-                      <span className={`status-pill ${app.riskScore.toLowerCase()}`} style={{ 
-                        background: app.riskScore === 'Critical' ? '#fee2e2' : app.riskScore === 'High' ? '#ffedd5' : '#f0fdf4',
-                        color: app.riskScore === 'Critical' ? '#b91c1c' : app.riskScore === 'High' ? '#c2410c' : '#15803d',
-                        padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold'
-                      }}>
-                        Risk: {app.riskScore}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        <span className={`status-pill ${app.riskScore.toLowerCase()}`} style={{ 
+                          background: app.riskScore === 'Critical' ? '#fee2e2' : app.riskScore === 'High' ? '#ffedd5' : '#f0fdf4',
+                          color: app.riskScore === 'Critical' ? '#b91c1c' : app.riskScore === 'High' ? '#c2410c' : '#15803d',
+                          padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold'
+                        }}>
+                          Risk: {app.riskScore}
+                        </span>
+                        {app.kbCitations && app.kbCitations.length > 0 && (
+                          <div style={{ fontSize: '10px', color: '#64748b', maxWidth: '150px', textAlign: 'right' }}>
+                            Based on: {app.kbCitations.join(', ')}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <p className="problem">
+                  <p className="problem" style={{ marginTop: '12px' }}>
                     <strong>Triage Summary:</strong> {app.triageSummary}
                   </p>
 
@@ -547,6 +627,36 @@ const DoctorDashboard = () => {
               />
             </label>
           </section>
+        )}
+
+        {/* PATIENT HISTORY MODAL */}
+        {patientHistory && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', width: '90%', maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0 }}>Patient History</h2>
+                <button onClick={() => setPatientHistory(null)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+              </div>
+              
+              {patientHistory.length === 0 ? (
+                <p>No past approved appointments found for this patient.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {patientHistory.map((hist, idx) => (
+                    <div key={idx} style={{ padding: '15px', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <strong style={{ color: '#334155' }}>Date: {new Date(hist.createdAt).toLocaleDateString()}</strong>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>Doctor: {hist.doctorId?.name}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '14px', color: '#475569' }}>
+                        <strong>Condition:</strong> {hist.triageSummary || hist.originalProblem}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
       </main>

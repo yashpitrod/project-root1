@@ -18,13 +18,13 @@ const AppRouter = () => {
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/student" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
-        <Route path="/doctor" element={<ProtectedRoute><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor" element={<DoctorDashboard />} />
         <Route path="/student/profile" element={<ProtectedRoute><StudentProfile /></ProtectedRoute>} />
         <Route path="/student/history" element={<ProtectedRoute><RequestHistory /></ProtectedRoute>} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         {/* ✅ fallback */}
         <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
     </BrowserRouter >
   );
 };
